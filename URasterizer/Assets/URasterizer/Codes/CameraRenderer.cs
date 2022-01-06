@@ -11,14 +11,12 @@ namespace URasterizer
 
         public RawImage rawImg;
 
+        public Color ClearColor = Color.black;
+
         public Transform[] objNodes;
         private RenderingObject[] renderingObjects;
         
-
         private Camera _camera;        
-
-        public float Angle;
-
         public bool WireframeMode;
 
         private void Start()
@@ -44,21 +42,24 @@ namespace URasterizer
 
             if (objNodes.Length == 0)
             {
-                renderingObjects = new RenderingObject[1];                
-                var _mesh = new Mesh();
-                _mesh.vertices = new Vector3[] { new Vector3(1f, 0f, -2f), new Vector3(0f, 2f, -2f), new Vector3(-1f, 0f, -2f) };
-                _mesh.triangles = new int[] { 0, 1, 2 };
+                renderingObjects = new RenderingObject[1];
+                var _mesh = new Mesh
+                {
+                    vertices = new Vector3[] { new Vector3(1f, 0f, -2f), new Vector3(0f, 2f, -2f), new Vector3(-1f, 0f, -2f) },
+                    triangles = new int[] { 0, 1, 2 }
+                };
                 renderingObjects[0] = new RenderingObject(_mesh);
             }
 
             RectTransform rect = rawImg.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(Screen.width, Screen.height);
             int w = Mathf.FloorToInt(rect.rect.width);
             int h = Mathf.FloorToInt(rect.rect.height);
             Debug.Log($"screen size: {w}x{h}");
 
             _rasterizer = new Rasterizer(w, h);
             rawImg.texture = _rasterizer.texture;
-            _rasterizer.ClearColor = _camera.backgroundColor;
+            _rasterizer.ClearColor = ClearColor;
         }
 
 
@@ -69,7 +70,7 @@ namespace URasterizer
 
             for(int i=0; i<renderingObjects.Length; ++i)
             {
-                r.Draw(renderingObjects[i].mesh, _camera, WireframeMode);
+                r.Draw(renderingObjects[i], _camera, WireframeMode);
             }                                 
 
             r.UpdateFrame();

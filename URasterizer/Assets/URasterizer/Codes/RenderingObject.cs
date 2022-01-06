@@ -17,7 +17,28 @@ namespace URasterizer
 
         public RenderingObject(Mesh mesh)
         {
-            this.mesh = mesh;
+            this.mesh = mesh;            
+        }
+
+        // TRS
+        public Matrix4x4 GetModelMatrix()
+        {
+            if(transform == null)
+            {
+                return TransformTool.GetRotZMatrix(0);
+            }
+
+            var matScale = TransformTool.GetScaleMatrix(transform.lossyScale);
+
+            var rotation = transform.rotation.eulerAngles;
+            var rotX = TransformTool.GetRotationMatrix(Vector3.right, -rotation.x);
+            var rotY = TransformTool.GetRotationMatrix(Vector3.up, rotation.y);
+            var rotZ = TransformTool.GetRotationMatrix(Vector3.forward, rotation.z);
+            var matRot = rotY * rotX * rotZ; // rotation apply order: z, x, y
+
+            var matTranslation = TransformTool.GetTranslationMatrix(transform.position);
+
+            return matTranslation * matRot * matScale;
         }
     }
 }

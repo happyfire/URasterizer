@@ -28,7 +28,59 @@ namespace URasterizer
             return view;
         }
 
-        public static Matrix4x4 GetModelMatrix(float rotation_angle)
+        //Get the result of rotate a vector around axis with angle radius.
+        //axis must be normalized.
+        public static Vector3 RotateVector(Vector3 axis, Vector3 v, float radius)
+        {            
+            Vector3 v_parallel = Vector3.Dot(axis, v) * axis;
+            Vector3 v_vertical = v - v_parallel;
+            float v_vertical_len = v_vertical.magnitude;
+
+            Vector3 a = axis;
+            Vector3 b = v_vertical.normalized;
+            Vector3 c = Vector3.Cross(a, b);
+            
+            Vector3 v_vertical_rot = v_vertical_len * (Mathf.Cos(radius) * b + Mathf.Sin(radius) * c);
+            return v_parallel + v_vertical_rot;
+        }
+
+        public static Matrix4x4 GetRotationMatrix(Vector3 axis, float angle)
+        {
+            Vector3 vx = new Vector3(1, 0, 0);
+            Vector3 vy = new Vector3(0, 1, 0);
+            Vector3 vz = new Vector3(0, 0, 1);            
+
+            axis.Normalize();
+            float radius = angle * D2R;
+
+            var tx = RotateVector(axis, vx, radius);
+            var ty = RotateVector(axis, vy, radius);
+            var tz = RotateVector(axis, vz, radius);
+
+            Matrix4x4 rotMat = Matrix4x4.identity;
+            rotMat.SetColumn(0, tx);
+            rotMat.SetColumn(1, ty);
+            rotMat.SetColumn(2, tz);
+            return rotMat;
+        }
+
+        public static Matrix4x4 GetTranslationMatrix(Vector3 translate)
+        {
+            Matrix4x4 translationMat = Matrix4x4.identity;
+            translationMat.SetColumn(3, new Vector4(translate.x, translate.y, -translate.z, 1));
+            return translationMat;
+        }
+
+        public static Matrix4x4 GetScaleMatrix(Vector3 scale)
+        {
+            Matrix4x4 scaleMat = Matrix4x4.identity;
+            scaleMat[0, 0] = scale.x;
+            scaleMat[1, 1] = scale.y;
+            scaleMat[2, 2] = scale.z;
+            return scaleMat;
+        }
+
+        public static Matrix4x4 GetRotZMatrix(float rotation_angle)
         {
             Matrix4x4 model = Matrix4x4.identity;
 
