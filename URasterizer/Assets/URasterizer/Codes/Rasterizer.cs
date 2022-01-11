@@ -64,6 +64,10 @@ namespace URasterizer
 
         public Color ClearColor { get; set; }
 
+        //Stats
+        public int Stats_Triangles;
+        public int Stats_Vertices;
+
         public Rasterizer(int w, int h)
         {
             Debug.Log($"Rasterizer screen size: {w}x{h}");
@@ -82,7 +86,7 @@ namespace URasterizer
         {
             get
             {
-                return _width / _height;
+                return (float)_width / _height;
             }
         }
 
@@ -170,6 +174,13 @@ namespace URasterizer
                     mvp * new Vector4(mesh.vertices[idx1].x, mesh.vertices[idx1].y, mesh.vertices[idx1].z, 1),
                     mvp * new Vector4(mesh.vertices[idx2].x, mesh.vertices[idx2].y, mesh.vertices[idx2].z, 1),
                 };
+
+                //do clipping
+                if (Clipped(v))
+                {
+                    continue;
+                }
+
                 
                 //clip space to NDC (Perspective division)                 
                 for(int k=0; k<3; k++)
@@ -209,6 +220,27 @@ namespace URasterizer
                 }
                 
             }
+        }
+
+        bool Clipped(Vector4[] v)
+        {
+            //裁剪（仅整体剔除）            
+            for (int i = 0; i < 3; ++i)
+            {
+                var vertex = v[i];
+                var w = -vertex.w;
+                bool inside = (vertex.x <= w && vertex.x >= -w
+                    && vertex.y <= w && vertex.y >= -w
+                    && vertex.z <= w && vertex.z >= -w);
+                if (inside)
+                {             
+                    //不裁剪三角形，只要有任意一点在clip space中则三角形整体保留
+                    return false;
+                }
+            }
+
+            //三个顶点都不在三角形中则剔除
+            return true;
         }
 
         #region Wireframe mode
@@ -318,10 +350,13 @@ namespace URasterizer
 
         #endregion
 
+        
+
         //Screen space  rasterization
         void RasterizeTriangle(Triangle t)
         {
             var v = t.Positions;
+            
             //Find out the bounding box of current triangle.
             float minX = v[0].x;
             float maxX = minX;
@@ -362,7 +397,7 @@ namespace URasterizer
 
             }
             else
-            {
+            {                
                 // 遍历当前三角形包围中的所有像素，判断当前像素是否在三角形中
                 // 对于在三角形中的像素，使用重心坐标插值得到深度值，并使用z buffer进行深度测试和写入
                 for(int y = minPY; y < maxPY; ++y)
