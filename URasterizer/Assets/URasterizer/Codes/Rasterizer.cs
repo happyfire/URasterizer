@@ -23,38 +23,20 @@ namespace URasterizer
 
         public Matrix4x4 ModelMatrix
         {
-            get
-            {
-                return _matModel;
-            }
-            set
-            {
-                _matModel = value;
-            }
+            get => _matModel;           
+            set => _matModel = value;            
         }
 
         public Matrix4x4 ViewMatrix
         {
-            get
-            {
-                return _matView;
-            }
-            set
-            {
-                _matView = value;
-            }
+            get => _matView;
+            set => _matView = value;
         }
 
         public Matrix4x4 ProjectionMatrix
         {
-            get
-            {
-                return _matProjection;
-            }
-            set
-            {
-                _matProjection = value;
-            }
+            get => _matProjection;
+            set => _matProjection = value;
         }
 
         Color[] frame_buf;
@@ -132,14 +114,15 @@ namespace URasterizer
 
             if (camera.orthographic)
             {
-                float halfOrthSize = camera.orthographicSize;
+                float halfOrthHeight = camera.orthographicSize;
+                float halfOrthWidth = halfOrthHeight * Aspect;
                 float f = -camera.farClipPlane;
                 float n = -camera.nearClipPlane;
-                ProjectionMatrix = TransformTool.GetOrthographicProjectionMatrix(-halfOrthSize, halfOrthSize, -halfOrthSize, halfOrthSize, f, n);
+                ProjectionMatrix = TransformTool.GetOrthographicProjectionMatrix(-halfOrthWidth, halfOrthWidth, -halfOrthHeight, halfOrthHeight, f, n);
             }
             else
             {
-                ProjectionMatrix = TransformTool.GetProjectionMatrix(camera.fieldOfView, Aspect, camera.nearClipPlane, camera.farClipPlane);
+                ProjectionMatrix = TransformTool.GetPerspectiveProjectionMatrix(camera.fieldOfView, Aspect, camera.nearClipPlane, camera.farClipPlane);
             }
         }
 
@@ -174,12 +157,15 @@ namespace URasterizer
                     mvp * new Vector4(mesh.vertices[idx1].x, mesh.vertices[idx1].y, mesh.vertices[idx1].z, 1),
                     mvp * new Vector4(mesh.vertices[idx2].x, mesh.vertices[idx2].y, mesh.vertices[idx2].z, 1),
                 };
+                
 
                 //do clipping
                 if (Clipped(v))
                 {
                     continue;
                 }
+
+                //backface culling
 
                 
                 //clip space to NDC (Perspective division)                 
@@ -200,7 +186,7 @@ namespace URasterizer
                     v[k] = vec;
                 }
 
-                //Triangle setup
+             
                 Triangle t = new Triangle();
                 for(int k=0; k<3; k++)
                 {
@@ -210,6 +196,7 @@ namespace URasterizer
                 t.SetColor(1, Color.green);
                 t.SetColor(2, Color.blue);
 
+                //Rasterization
                 if (wireframeMode)
                 {
                     RasterizeWireframe(t);

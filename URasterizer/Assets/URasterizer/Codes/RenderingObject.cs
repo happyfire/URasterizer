@@ -34,7 +34,7 @@ namespace URasterizer
             var rotX = TransformTool.GetRotationMatrix(Vector3.right, -rotation.x);
             var rotY = TransformTool.GetRotationMatrix(Vector3.up, rotation.y);
             var rotZ = TransformTool.GetRotationMatrix(Vector3.forward, rotation.z);
-            var matRot = rotY * rotX * rotZ; // rotation apply order: z, x, y
+            var matRot = rotY * rotX * rotZ; // rotation apply order: z(roll), x(pitch), y(yaw) 
 
             var matTranslation = TransformTool.GetTranslationMatrix(transform.position);
 

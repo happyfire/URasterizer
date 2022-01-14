@@ -95,7 +95,7 @@ namespace URasterizer
         }
 
         //根据ViewSpace下的frustum剪裁面坐标计算正交投影矩阵。
-        //ViewSpace使用左手坐标系，camera看向-Z轴。
+        //ViewSpace使用右手坐标系，camera看向-Z轴。
         //所有参数都是坐标值。因此f和n都是负数，且 f < n
         public static Matrix4x4 GetOrthographicProjectionMatrix(float l, float r, float b, float t, float f, float n)
         {
@@ -109,7 +109,7 @@ namespace URasterizer
         }
 
         //根据ViewSpace下的frustum剪裁面坐标计算透视投影矩阵。
-        //ViewSpace使用左手坐标系，camera看向-Z轴。
+        //ViewSpace使用右手坐标系，camera看向-Z轴。
         //所有参数都是坐标值。因此f和n都是负数，且 f < n        
         public static Matrix4x4 GetPerspectiveProjectionMatrix(float l, float r, float b, float t, float f, float n)
         {
@@ -125,7 +125,7 @@ namespace URasterizer
         }
 
         //根据FOV等参数计算透视投影矩阵。fov为fov y, aspect_ratio为宽/高，zNear,zFar为距离值（正数）
-        public static Matrix4x4 GetProjectionMatrix(float eye_fov, float aspect_ratio, float zNear, float zFar)
+        public static Matrix4x4 GetPerspectiveProjectionMatrix(float eye_fov, float aspect_ratio, float zNear, float zFar)
         {
             float t = zNear * Mathf.Tan(eye_fov * D2R * 0.5f);
             float b = -t;
