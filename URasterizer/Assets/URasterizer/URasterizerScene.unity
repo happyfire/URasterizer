@@ -379,11 +379,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   rawImg: {fileID: 129304943}
   ClearColor: {r: 0, g: 0, b: 0, a: 0.5019608}
-  objNodes:
-  - {fileID: 256726195}
-  - {fileID: 963210798}
-  - {fileID: 1297680263}
-  - {fileID: 1825649044}
+  objNodes: []
   WireframeMode: 0
 --- !u!1 &870169031
 GameObject:

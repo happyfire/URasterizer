@@ -6,7 +6,7 @@ namespace URasterizer
 {
     //计算变换矩阵
     //约定如下：
-    //1. Modle, View使用右手坐标系。Projection使用OpenGL约定(左手坐标系，NDC范围[-1,1])
+    //1. Modle, View使用右手坐标系。NDC也是右手坐标系(GAMES101规范），NDC范围[-1,1]，注意：f为-1，n为+1
     //2. 矩阵使用Column Major
     //3. ViewSpace中, camera看向负Z轴方向
     //4. 参数约定见函数注释

@@ -211,11 +211,15 @@ namespace URasterizer
 
         bool Clipped(Vector4[] v)
         {
-            //裁剪（仅整体剔除）            
+            //Clip space使用GAMES101规范，右手坐标系，n为+1， f为-1
+            //裁剪（仅整体剔除）     
+            //实际的硬件是在Clip space裁剪，所以此处我们也使用clip space （当然由于我们不真正的裁剪，只是整体剔除，所以其实在NDC操作更方便）
             for (int i = 0; i < 3; ++i)
             {
                 var vertex = v[i];
-                var w = -vertex.w;
+                var w = vertex.w;
+                w = w >= 0 ? w : -w; //由于NDC中总是满足-1<=Zndc<=1, 而当 w < 0 时，-w >= Zclip = Zndc*w >= w。为了保持比较符号一致，直接将w取正
+                //Debug.LogError("w=" + w);
                 bool inside = (vertex.x <= w && vertex.x >= -w
                     && vertex.y <= w && vertex.y >= -w
                     && vertex.z <= w && vertex.z >= -w);

@@ -45,8 +45,9 @@ namespace URasterizer
                 renderingObjects = new RenderingObject[1];
                 var _mesh = new Mesh
                 {
-                    vertices = new Vector3[] { new Vector3(1f, 0f, -2f), new Vector3(0f, 2f, -2f), new Vector3(-1f, 0f, -2f) },
-                    triangles = new int[] { 0, 1, 2 }
+                    vertices = new Vector3[] { new Vector3(1f, 0f, -2f), new Vector3(0f, 2f, -2f), new Vector3(-1f, 0f, -2f),
+                            new Vector3(1.5f, 0.5f, -1.5f), new Vector3(0.5f, 2.5f, -1.5f), new Vector3(-0.5f, 0.5f, -1.5f)},
+                    triangles = new int[] { 0, 1, 2, 3, 4, 5 }
                 };
                 renderingObjects[0] = new RenderingObject(_mesh);
             }
