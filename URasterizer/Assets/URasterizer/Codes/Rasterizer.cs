@@ -218,7 +218,7 @@ namespace URasterizer
             {
                 var vertex = v[i];
                 var w = vertex.w;
-                w = w >= 0 ? w : -w; //由于NDC中总是满足-1<=Zndc<=1, 而当 w < 0 时，-w >= Zclip = Zndc*w >= w。为了保持比较符号一致，直接将w取正
+                w = w >= 0 ? w : -w; //由于NDC中总是满足-1<=Zndc<=1, 而当 w < 0 时，-w >= Zclip = Zndc*w >= w。所以此时clip space的坐标范围是[w,-w], 为了比较时更明确，将w取正
                 //Debug.LogError("w=" + w);
                 bool inside = (vertex.x <= w && vertex.x >= -w
                     && vertex.y <= w && vertex.y >= -w
