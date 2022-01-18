@@ -131,13 +131,7 @@ namespace URasterizer
             Mesh mesh = ro.mesh;
             SetupViewProjectionMatrix(camera);
 
-            ModelMatrix = ro.GetModelMatrix();
-            
-
-            float far = camera.farClipPlane;
-            float near = camera.nearClipPlane;
-            float f1 = (far - near) / 2.0f;
-            float f2 = (far + near) / 2.0f;
+            ModelMatrix = ro.GetModelMatrix();                      
 
             Matrix4x4 mvp = _matProjection * _matView * _matModel;
 
@@ -163,26 +157,40 @@ namespace URasterizer
                 if (Clipped(v))
                 {
                     continue;
-                }
-
-                //backface culling
-
+                }               
                 
                 //clip space to NDC (Perspective division)                 
                 for(int k=0; k<3; k++)
                 {
                     v[k].x /= v[k].w;
                     v[k].y /= v[k].w;
-                    v[k].z /= v[k].w;                    
+                    v[k].z /= v[k].w;                  
                 }
 
-                //NDC to screen space
+                //backface culling
+                Vector3 v0 = new Vector3(v[0].x, v[0].y, v[0].z);
+                Vector3 v1 = new Vector3(v[1].x, v[1].y, v[1].z);
+                Vector3 v2 = new Vector3(v[2].x, v[2].y, v[2].z);
+                Vector3 e01 = v1 - v0;
+                Vector3 e02 = v2 - v0;
+                Vector3 cross = Vector3.Cross(e01, e02);
+                if(cross.z <= 0)
+                {
+                    continue;
+                }
+
+
+                //NDC to screen space, viewport transform
                 for (int k = 0; k < 3; k++)
                 {
                     var vec = v[k];
                     vec.x = 0.5f * _width * (vec.x + 1.0f);
                     vec.y = 0.5f * _height * (vec.y + 1.0f);
-                    vec.z = vec.z * f1 + f2;
+
+                    //GAMES101约定的NDC是右手坐标系，z值范围是[-1,1]，但n为1，f为-1，因此值越大越靠近n。
+                    //为了符合深度值越小离camera越近的惯例，将View space的Z值反转一下，这样后面深度测试的时候就可以使用LESS_EQUAL测试了
+                    vec.z = -vec.z; 
+
                     v[k] = vec;
                 }
 
@@ -408,9 +416,9 @@ namespace URasterizer
                             z_interpolated *= w_reciprocal;
                             //深度测试
                             int index = GetIndex(x, y);
-                            if(-z_interpolated < depth_buf[index])
+                            if(z_interpolated <= depth_buf[index])
                             {
-                                depth_buf[index] = -z_interpolated;
+                                depth_buf[index] = z_interpolated;
                                 Color color_interpolated = alpha * t.Colors[0] / v[0].w + beta * t.Colors[1] / v[1].w + gamma * t.Colors[2] / v[2].w;
                                 color_interpolated *= w_reciprocal;
                                 frame_buf[index] = color_interpolated;
