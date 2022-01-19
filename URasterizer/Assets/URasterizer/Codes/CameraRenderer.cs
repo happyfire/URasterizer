@@ -12,9 +12,8 @@ namespace URasterizer
         public RawImage rawImg;
 
         public Color ClearColor = Color.black;
-
-        public Transform[] objNodes;
-        private RenderingObject[] renderingObjects;
+        
+        private List<RenderingObject> renderingObjects = new List<RenderingObject>();
         
         private Camera _camera;        
         public bool WireframeMode;
@@ -33,23 +32,31 @@ namespace URasterizer
         {
             _camera = GetComponent<Camera>();
 
-            //collect render objects
-            renderingObjects = new RenderingObject[objNodes.Length];
-            for (int i = 0; i < objNodes.Length; ++i)
+            var rootObjs = this.gameObject.scene.GetRootGameObjects();
+            renderingObjects.Clear();
+            foreach(var o in rootObjs)
             {
-                renderingObjects[i] = new RenderingObject(objNodes[i]);
+                renderingObjects.AddRange(o.GetComponentsInChildren<RenderingObject>());
             }
+            
+            Debug.Log($"Find rendering objs count:{renderingObjects.Count}");
+            
 
-            if (objNodes.Length == 0)
-            {
-                renderingObjects = new RenderingObject[1];
+            //手动设置的mesh
+            {                
                 var _mesh = new Mesh
                 {
                     vertices = new Vector3[] { new Vector3(1f, 0f, -2f), new Vector3(0f, 2f, -2f), new Vector3(-1f, 0f, -2f),
                             new Vector3(1.5f, 0.5f, -1.5f), new Vector3(0.5f, 2.5f, -1.5f), new Vector3(-0.5f, 0.5f, -1.5f)},
                     triangles = new int[] { 0, 1, 2, 3, 4, 5 }
                 };
-                renderingObjects[0] = new RenderingObject(_mesh);
+                var go = new GameObject("_handmake_mesh_");
+                var ro = go.AddComponent<RenderingObject>();
+                ro.mesh = _mesh;
+                go.AddComponent<MeshFilter>().mesh = _mesh;
+                go.AddComponent<MeshRenderer>();
+
+                renderingObjects.Add(ro);
             }
 
             RectTransform rect = rawImg.GetComponent<RectTransform>();
@@ -69,9 +76,12 @@ namespace URasterizer
             var r = _rasterizer;
             r.Clear(BufferMask.Color | BufferMask.Depth);
 
-            for(int i=0; i<renderingObjects.Length; ++i)
+            for(int i=0; i<renderingObjects.Count; ++i)
             {
-                r.Draw(renderingObjects[i], _camera, WireframeMode);
+                if (renderingObjects[i].gameObject.activeInHierarchy)
+                {
+                    r.Draw(renderingObjects[i], _camera, WireframeMode);
+                }
             }                                 
 
             r.UpdateFrame();

@@ -3,22 +3,22 @@ using UnityEngine;
 
 namespace URasterizer
 {
-    public class RenderingObject
-    {
-        public Transform transform;
+    public class RenderingObject: MonoBehaviour
+    {        
         public Mesh mesh;
+        public bool DoubleSideRendering;
+        public Color Color0 = Color.red;
+        public Color Color1 = Color.green;
+        public Color Color2 = Color.blue;
 
-
-        public RenderingObject(Transform node)
+        private void Awake()
         {
-            transform = node;
-            mesh = node.GetComponent<MeshFilter>().mesh;
-        }
-
-        public RenderingObject(Mesh mesh)
-        {
-            this.mesh = mesh;            
-        }
+            var meshFilter = GetComponent<MeshFilter>();
+            if(meshFilter != null)
+            {
+                mesh = meshFilter.mesh;
+            }
+        }    
 
         // TRS
         public Matrix4x4 GetModelMatrix()

@@ -168,15 +168,18 @@ namespace URasterizer
                 }
 
                 //backface culling
-                Vector3 v0 = new Vector3(v[0].x, v[0].y, v[0].z);
-                Vector3 v1 = new Vector3(v[1].x, v[1].y, v[1].z);
-                Vector3 v2 = new Vector3(v[2].x, v[2].y, v[2].z);
-                Vector3 e01 = v1 - v0;
-                Vector3 e02 = v2 - v0;
-                Vector3 cross = Vector3.Cross(e01, e02);
-                if(cross.z <= 0)
+                if (!ro.DoubleSideRendering)
                 {
-                    continue;
+                    Vector3 v0 = new Vector3(v[0].x, v[0].y, v[0].z);
+                    Vector3 v1 = new Vector3(v[1].x, v[1].y, v[1].z);
+                    Vector3 v2 = new Vector3(v[2].x, v[2].y, v[2].z);
+                    Vector3 e01 = v1 - v0;
+                    Vector3 e02 = v2 - v0;
+                    Vector3 cross = Vector3.Cross(e01, e02);
+                    if (cross.z <= 0)
+                    {
+                        continue;
+                    }
                 }
 
 
@@ -200,9 +203,9 @@ namespace URasterizer
                 {
                     t.SetPosition(k, v[k]);
                 }
-                t.SetColor(0, Color.red);
-                t.SetColor(1, Color.green);
-                t.SetColor(2, Color.blue);
+                t.SetColor(0, ro.Color0);
+                t.SetColor(1, ro.Color1);
+                t.SetColor(2, ro.Color2);
 
                 //Rasterization
                 if (wireframeMode)

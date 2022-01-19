@@ -207,13 +207,14 @@ GameObject:
   - component: {fileID: 256726194}
   - component: {fileID: 256726193}
   - component: {fileID: 256726192}
+  - component: {fileID: 256726196}
   m_Layer: 0
   m_Name: Cube
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!65 &256726192
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -290,6 +291,23 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 4
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &256726196
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 256726191}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 275ec1cd091f7d54cb532cf4c552b27a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  mesh: {fileID: 0}
+  DoubleSideRendering: 0
+  Color0: {r: 1, g: 0, b: 0, a: 1}
+  Color1: {r: 0, g: 1, b: 0, a: 1}
+  Color2: {r: 0, g: 0, b: 1, a: 1}
 --- !u!1 &264331597
 GameObject:
   m_ObjectHideFlags: 0
@@ -379,7 +397,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   rawImg: {fileID: 129304943}
   ClearColor: {r: 0, g: 0, b: 0, a: 0.5019608}
-  objNodes: []
   WireframeMode: 0
 --- !u!1 &870169031
 GameObject:
@@ -560,6 +577,7 @@ GameObject:
   - component: {fileID: 963210797}
   - component: {fileID: 963210796}
   - component: {fileID: 963210795}
+  - component: {fileID: 963210799}
   m_Layer: 0
   m_Name: Sphere
   m_TagString: Untagged
@@ -644,6 +662,23 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 6
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &963210799
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 963210794}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 275ec1cd091f7d54cb532cf4c552b27a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  mesh: {fileID: 0}
+  DoubleSideRendering: 0
+  Color0: {r: 1, g: 0, b: 0, a: 1}
+  Color1: {r: 0, g: 1, b: 0, a: 1}
+  Color2: {r: 0, g: 0, b: 1, a: 1}
 --- !u!1 &1292409238
 GameObject:
   m_ObjectHideFlags: 0
@@ -735,6 +770,7 @@ GameObject:
   - component: {fileID: 1297680262}
   - component: {fileID: 1297680261}
   - component: {fileID: 1297680260}
+  - component: {fileID: 1297680264}
   m_Layer: 0
   m_Name: Quad
   m_TagString: Untagged
@@ -819,6 +855,23 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 5
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1297680264
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1297680259}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 275ec1cd091f7d54cb532cf4c552b27a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  mesh: {fileID: 0}
+  DoubleSideRendering: 1
+  Color0: {r: 1, g: 0, b: 0, a: 1}
+  Color1: {r: 0, g: 1, b: 0, a: 1}
+  Color2: {r: 0, g: 0, b: 1, a: 1}
 --- !u!1 &1825649040
 GameObject:
   m_ObjectHideFlags: 0
@@ -831,13 +884,14 @@ GameObject:
   - component: {fileID: 1825649043}
   - component: {fileID: 1825649042}
   - component: {fileID: 1825649041}
+  - component: {fileID: 1825649045}
   m_Layer: 0
   m_Name: Capsule
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!136 &1825649041
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -915,6 +969,23 @@ Transform:
   m_Father: {fileID: 963210798}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1825649045
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1825649040}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 275ec1cd091f7d54cb532cf4c552b27a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  mesh: {fileID: 0}
+  DoubleSideRendering: 0
+  Color0: {r: 1, g: 0, b: 0, a: 1}
+  Color1: {r: 0, g: 1, b: 0, a: 1}
+  Color2: {r: 0, g: 0, b: 1, a: 1}
 --- !u!1 &1899433433
 GameObject:
   m_ObjectHideFlags: 0
