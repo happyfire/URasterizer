@@ -9,14 +9,12 @@ namespace URasterizer
     {        
         Rasterizer _rasterizer;
 
-        public RawImage rawImg;
-
-        public Color ClearColor = Color.black;
+        public RawImage rawImg;        
         
         private List<RenderingObject> renderingObjects = new List<RenderingObject>();
         
-        private Camera _camera;        
-        public bool WireframeMode;
+        private Camera _camera;
+        public RenderingConfig _config;
 
         private void Start()
         {
@@ -44,11 +42,12 @@ namespace URasterizer
 
             //手动设置的mesh
             {                
+                //手动模型也使用左手系
                 var _mesh = new Mesh
                 {
-                    vertices = new Vector3[] { new Vector3(1f, 0f, -2f), new Vector3(0f, 2f, -2f), new Vector3(-1f, 0f, -2f),
-                            new Vector3(1.5f, 0.5f, -1.5f), new Vector3(0.5f, 2.5f, -1.5f), new Vector3(-0.5f, 0.5f, -1.5f)},
-                    triangles = new int[] { 0, 1, 2, 3, 4, 5 }
+                    vertices = new Vector3[] { new Vector3(1f, 0f, 2f), new Vector3(0f, 2f, 2f), new Vector3(-1f, 0f, 2f),
+                            new Vector3(1.5f, 0.5f, 1.5f), new Vector3(0.5f, 2.5f, 1.5f), new Vector3(-0.5f, 0.5f, 1.5f)},
+                    triangles = new int[] { 0, 2, 1, 3, 5, 4 }
                 };
                 var go = new GameObject("_handmake_mesh_");
                 var ro = go.AddComponent<RenderingObject>();
@@ -65,9 +64,8 @@ namespace URasterizer
             int h = Mathf.FloorToInt(rect.rect.height);
             Debug.Log($"screen size: {w}x{h}");
 
-            _rasterizer = new Rasterizer(w, h);
-            rawImg.texture = _rasterizer.texture;
-            _rasterizer.ClearColor = ClearColor;
+            _rasterizer = new Rasterizer(w, h, _config);
+            rawImg.texture = _rasterizer.texture;            
         }
 
 
@@ -80,7 +78,7 @@ namespace URasterizer
             {
                 if (renderingObjects[i].gameObject.activeInHierarchy)
                 {
-                    r.Draw(renderingObjects[i], _camera, WireframeMode);
+                    r.Draw(renderingObjects[i], _camera);
                 }
             }                                 
 

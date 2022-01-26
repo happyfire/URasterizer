@@ -15,7 +15,7 @@ namespace URasterizer
         int _width;
         int _height;
 
-        bool _MSAA;
+        RenderingConfig _config;
 
         Matrix4x4 _matModel;
         Matrix4x4 _matView;
@@ -42,17 +42,17 @@ namespace URasterizer
         Color[] frame_buf;
         float[] depth_buf;
 
-        public Texture2D texture;
-
-        public Color ClearColor { get; set; }
+        public Texture2D texture;        
 
         //Stats
         public int Stats_Triangles;
         public int Stats_Vertices;
 
-        public Rasterizer(int w, int h)
+        public Rasterizer(int w, int h, RenderingConfig config)
         {
             Debug.Log($"Rasterizer screen size: {w}x{h}");
+
+            _config = config;
 
             _width = w;
             _height = h;
@@ -98,7 +98,7 @@ namespace URasterizer
         {
             if((mask & BufferMask.Color) == BufferMask.Color)
             {                
-                FillArray(frame_buf, ClearColor);
+                FillArray(frame_buf, _config.ClearColor);
             }
             if((mask & BufferMask.Depth) == BufferMask.Depth)
             {
@@ -126,7 +126,7 @@ namespace URasterizer
             }
         }
 
-        public void Draw(RenderingObject ro, Camera camera, bool wireframeMode=false)
+        public void Draw(RenderingObject ro, Camera camera)
         {
             Mesh mesh = ro.mesh;
             SetupViewProjectionMatrix(camera);
@@ -135,21 +135,26 @@ namespace URasterizer
 
             Matrix4x4 mvp = _matProjection * _matView * _matModel;
 
+
             var indices = mesh.triangles;
             for(int i=0; i< indices.Length; i+=3)
             {
-                int idx0 = indices[i];
-                int idx1 = indices[i+1];
-                int idx2 = indices[i+2];
+                //Unity模型本地坐标系也是左手系，需要转成我们使用的右手系
+                //1. z轴反转
+                //2. 三角形顶点环绕方向从顺时针改成逆时针
 
+                int idx0 = indices[i];
+                int idx1 = indices[i+2]; //注意这儿对调了v1和v2的索引，因为原来的 0,1,2是顺时针的，对调后是 0,2,1，是逆时针的
+                int idx2 = indices[i+1];
+                                
                 //vertex shader
 
                 //world to clip space
                 Vector4[] v =
                 {
-                    mvp * new Vector4(mesh.vertices[idx0].x, mesh.vertices[idx0].y, mesh.vertices[idx0].z, 1),
-                    mvp * new Vector4(mesh.vertices[idx1].x, mesh.vertices[idx1].y, mesh.vertices[idx1].z, 1),
-                    mvp * new Vector4(mesh.vertices[idx2].x, mesh.vertices[idx2].y, mesh.vertices[idx2].z, 1),
+                    mvp * new Vector4(mesh.vertices[idx0].x, mesh.vertices[idx0].y, -mesh.vertices[idx0].z, 1), //注意这儿反转了z坐标
+                    mvp * new Vector4(mesh.vertices[idx1].x, mesh.vertices[idx1].y, -mesh.vertices[idx1].z, 1),
+                    mvp * new Vector4(mesh.vertices[idx2].x, mesh.vertices[idx2].y, -mesh.vertices[idx2].z, 1),
                 };
                 
 
@@ -168,7 +173,7 @@ namespace URasterizer
                 }
 
                 //backface culling
-                if (!ro.DoubleSideRendering)
+                if (_config.BackfaceCulling && !ro.DoubleSideRendering)
                 {
                     Vector3 v0 = new Vector3(v[0].x, v[0].y, v[0].z);
                     Vector3 v1 = new Vector3(v[1].x, v[1].y, v[1].z);
@@ -208,7 +213,7 @@ namespace URasterizer
                 t.SetColor(2, ro.Color2);
 
                 //Rasterization
-                if (wireframeMode)
+                if (_config.WireframeMode)
                 {
                     RasterizeWireframe(t);
                 }
@@ -394,11 +399,7 @@ namespace URasterizer
             int maxPY = Mathf.CeilToInt(maxY);
             maxPY = maxPY > _height ? _height : maxPY;
 
-            if (_MSAA)
-            {
-
-            }
-            else
+  
             {                
                 // 遍历当前三角形包围中的所有像素，判断当前像素是否在三角形中
                 // 对于在三角形中的像素，使用重心坐标插值得到深度值，并使用z buffer进行深度测试和写入
@@ -422,6 +423,7 @@ namespace URasterizer
                             if(z_interpolated <= depth_buf[index])
                             {
                                 depth_buf[index] = z_interpolated;
+                                
                                 Color color_interpolated = alpha * t.Colors[0] / v[0].w + beta * t.Colors[1] / v[1].w + gamma * t.Colors[2] / v[2].w;
                                 color_interpolated *= w_reciprocal;
                                 frame_buf[index] = color_interpolated;
@@ -492,10 +494,6 @@ namespace URasterizer
 
         public void UpdateFrame()
         {
-
-            //SetPixel(new Vector3(0,0), Color.red);
-            //SetPixel(new Vector3(0, _height-1), Color.green);
-
             texture.SetPixels(frame_buf);
             texture.Apply();
         }
