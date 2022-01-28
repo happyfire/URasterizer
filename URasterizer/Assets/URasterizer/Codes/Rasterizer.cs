@@ -143,9 +143,11 @@ namespace URasterizer
                 //1. z轴反转
                 //2. 三角形顶点环绕方向从顺时针改成逆时针
 
-                int idx0 = indices[i];
-                int idx1 = indices[i+2]; //注意这儿对调了v1和v2的索引，因为原来的 0,1,2是顺时针的，对调后是 0,2,1，是逆时针的
-                int idx2 = indices[i+1];
+                //注意这儿对调了v0和v1的索引，因为原来的 0,1,2是顺时针的，对调后是 1,0,2是逆时针的
+                //Unity Quard模型的两个三角形索引分别是 0,3,1,3,0,2 转换后为 3,0,1,0,3,2
+                int idx0 = indices[i+1];
+                int idx1 = indices[i]; 
+                int idx2 = indices[i+2];
                                 
                 //vertex shader
 
@@ -181,7 +183,7 @@ namespace URasterizer
                     Vector3 e01 = v1 - v0;
                     Vector3 e02 = v2 - v0;
                     Vector3 cross = Vector3.Cross(e01, e02);
-                    if (cross.z <= 0)
+                    if (cross.z < 0)
                     {
                         continue;
                     }
@@ -208,9 +210,21 @@ namespace URasterizer
                 {
                     t.SetPosition(k, v[k]);
                 }
-                t.SetColor(0, ro.Color0);
-                t.SetColor(1, ro.Color1);
-                t.SetColor(2, ro.Color2);
+
+                //设置顶点色,使用config中的颜色数组循环设置
+                int vertexColorCount = _config.VertexColors.Length;
+                if(vertexColorCount > 0)
+                {
+                    t.SetColor(0, _config.VertexColors[idx0 % vertexColorCount]);
+                    t.SetColor(1, _config.VertexColors[idx1 % vertexColorCount]);
+                    t.SetColor(2, _config.VertexColors[idx2 % vertexColorCount]);
+                }
+                else
+                {
+                    t.SetColor(0, Color.white);
+                    t.SetColor(1, Color.white);
+                    t.SetColor(2, Color.white);
+                }                             
 
                 //Rasterization
                 if (_config.WireframeMode)
@@ -251,7 +265,7 @@ namespace URasterizer
         }
 
         #region Wireframe mode
-        private void DrawLine(Vector3 begin, Vector3 end, Color line_color)
+        private void DrawLine(Vector3 begin, Vector3 end, Color colorBegin, Color colorEnd)
         {            
             int x1 = Mathf.FloorToInt(begin.x);
             int y1 = Mathf.FloorToInt(begin.y);
@@ -265,7 +279,7 @@ namespace URasterizer
             dx1 = Math.Abs(dx);
             dy1 = Math.Abs(dy);
             px = 2 * dy1 - dx1;
-            py = 2 * dx1 - dy1;
+            py = 2 * dx1 - dy1;            
 
             if (dy1 <= dx1)
             {
@@ -282,6 +296,7 @@ namespace URasterizer
                     xe = x1;
                 }
                 Vector3 point = new Vector3(x, y, 1.0f);
+                Color line_color = dx >= 0 ? colorBegin : colorEnd;
                 SetPixel(point, line_color);
                 for (i = 0; x < xe; i++)
                 {
@@ -304,6 +319,8 @@ namespace URasterizer
                     }
                     
                     Vector3 pt = new Vector3(x, y, 1.0f);
+                    float t = (float)(xe - x) / dx1;
+                    line_color = Color.Lerp(colorBegin, colorEnd, t);                    
                     SetPixel(pt, line_color);
                 }
             }
@@ -322,7 +339,9 @@ namespace URasterizer
                     ye = y1;
                 }
                 Vector3 point = new Vector3(x, y, 1.0f);
+                Color line_color = dy >= 0 ? colorBegin : colorEnd;
                 SetPixel(point, line_color);
+                
                 for (i = 0; y < ye; i++)
                 {
                     y++;
@@ -343,6 +362,8 @@ namespace URasterizer
                         py += 2 * (dx1 - dy1);
                     }
                     Vector3 pt = new Vector3(x, y, 1.0f);
+                    float t = (float)(ye - y) / dy1;
+                    line_color = Color.Lerp(colorBegin, colorEnd, t);
                     SetPixel(pt, line_color);
                 }
             }
@@ -350,9 +371,9 @@ namespace URasterizer
 
         private void RasterizeWireframe(Triangle t)
         {
-            DrawLine(t.Positions[0], t.Positions[1], t.Colors[0]);
-            DrawLine(t.Positions[1], t.Positions[2], t.Colors[1]);
-            DrawLine(t.Positions[2], t.Positions[0], t.Colors[2]);
+            DrawLine(t.Positions[0], t.Positions[1], t.Colors[0], t.Colors[1]);
+            DrawLine(t.Positions[1], t.Positions[2], t.Colors[1], t.Colors[2]);
+            DrawLine(t.Positions[2], t.Positions[0], t.Colors[2], t.Colors[0]);
         }
 
         #endregion

@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
-    <LangVersion>latest</LangVersion>
+    <LangVersion>8.0</LangVersion>
   </PropertyGroup>
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -53,13 +53,16 @@
     <UnityVersion>2020.3.25f1c1</UnityVersion>
   </PropertyGroup>
   <ItemGroup>
+    <Analyzer Include="C:\Program Files (x86)\Microsoft Visual Studio Tools for Unity\16.0\Analyzers\Microsoft.Unity.Analyzers.dll" />
+  </ItemGroup>
+  <ItemGroup>
     <Compile Include="Assets\URasterizer\Codes\RenderingObject.cs" />
+    <Compile Include="Assets\URasterizer\Codes\RenderingConfig.cs" />
     <Compile Include="Assets\URasterizer\Codes\StatsPanel.cs" />
     <Compile Include="Assets\URasterizer\Codes\CameraRenderer.cs" />
     <Compile Include="Assets\URasterizer\Codes\Triangle.cs" />
     <Compile Include="Assets\URasterizer\Codes\Rasterizer.cs" />
     <Compile Include="Assets\URasterizer\Codes\TransformTool.cs" />
-    <Compile Include="Assets\URasterizer\Codes\RenderingConfig.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="UnityEngine">

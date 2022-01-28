@@ -7,9 +7,6 @@ namespace URasterizer
     {        
         public Mesh mesh;
         public bool DoubleSideRendering;
-        public Color Color0 = Color.red;
-        public Color Color1 = Color.green;
-        public Color Color2 = Color.blue;
 
         private void Awake()
         {

@@ -305,9 +305,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   mesh: {fileID: 0}
   DoubleSideRendering: 0
-  Color0: {r: 1, g: 0, b: 0, a: 1}
-  Color1: {r: 0, g: 1, b: 0, a: 1}
-  Color2: {r: 0, g: 0, b: 1, a: 1}
 --- !u!1 &264331597
 GameObject:
   m_ObjectHideFlags: 0
@@ -662,9 +659,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   mesh: {fileID: 0}
   DoubleSideRendering: 0
-  Color0: {r: 1, g: 0, b: 0, a: 1}
-  Color1: {r: 0, g: 1, b: 0, a: 1}
-  Color2: {r: 0, g: 0, b: 1, a: 1}
 --- !u!95 &963210800
 Animator:
   serializedVersion: 3
@@ -874,9 +868,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   mesh: {fileID: 0}
   DoubleSideRendering: 0
-  Color0: {r: 1, g: 0, b: 0, a: 1}
-  Color1: {r: 0, g: 1, b: 0, a: 1}
-  Color2: {r: 0, g: 0, b: 1, a: 1}
 --- !u!1 &1825649040
 GameObject:
   m_ObjectHideFlags: 0
@@ -993,9 +984,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   mesh: {fileID: 0}
   DoubleSideRendering: 0
-  Color0: {r: 1, g: 0, b: 0, a: 1}
-  Color1: {r: 0, g: 1, b: 0, a: 1}
-  Color2: {r: 0, g: 0, b: 1, a: 1}
 --- !u!1 &1899433433
 GameObject:
   m_ObjectHideFlags: 0

@@ -9,4 +9,7 @@ public class RenderingConfig : ScriptableObject
     public bool WireframeMode = false;
     public bool BackfaceCulling = true;
     public bool MSAA = false;
+    
+    [Header("Vertex Color Setting")]    
+    public Color[] VertexColors;
 }
