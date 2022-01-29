@@ -10,6 +10,8 @@ namespace URasterizer
         Depth = 2
     }
 
+    public delegate void OnRasterizerStatUpdate(int verticesAll, int trianglesAll, int trianglesRendered);
+
     public class Rasterizer
     {
         int _width;
@@ -45,8 +47,11 @@ namespace URasterizer
         public Texture2D texture;        
 
         //Stats
-        public int Stats_Triangles;
-        public int Stats_Vertices;
+        int _trianglesAll, _trianglesRendered;
+        int _verticesAll;
+
+        public OnRasterizerStatUpdate StatDelegate;
+
 
         public Rasterizer(int w, int h, RenderingConfig config)
         {
@@ -104,6 +109,9 @@ namespace URasterizer
             {
                 FillArray(depth_buf, float.MaxValue);
             }
+
+            _trianglesAll = _trianglesRendered = 0;
+            _verticesAll = 0;
         }
 
         public void SetupViewProjectionMatrix(Camera camera)
@@ -135,28 +143,37 @@ namespace URasterizer
 
             Matrix4x4 mvp = _matProjection * _matView * _matModel;
 
+            _verticesAll += mesh.vertexCount;
+            _trianglesAll += mesh.triangles.Length / 3;
+
+            //Unity模型本地坐标系也是左手系，需要转成我们使用的右手系
+            //1. z轴反转
+            //2. 三角形顶点环绕方向从顺时针改成逆时针
+
+
+            //vertex shader
+            Vector4[] csVertices = new Vector4[mesh.vertexCount]; //clip space vertices
+            for(int i=0; i<mesh.vertexCount; ++i)
+            {                
+                var vert = mesh.vertices[i];                
+                csVertices[i] = mvp * new Vector4(vert.x, vert.y, -vert.z, 1); //注意这儿反转了z坐标
+            }
+
 
             var indices = mesh.triangles;
             for(int i=0; i< indices.Length; i+=3)
-            {
-                //Unity模型本地坐标系也是左手系，需要转成我们使用的右手系
-                //1. z轴反转
-                //2. 三角形顶点环绕方向从顺时针改成逆时针
-
+            {                
                 //注意这儿对调了v0和v1的索引，因为原来的 0,1,2是顺时针的，对调后是 1,0,2是逆时针的
                 //Unity Quard模型的两个三角形索引分别是 0,3,1,3,0,2 转换后为 3,0,1,0,3,2
                 int idx0 = indices[i+1];
                 int idx1 = indices[i]; 
                 int idx2 = indices[i+2];
-                                
-                //vertex shader
-
-                //world to clip space
+                             
                 Vector4[] v =
                 {
-                    mvp * new Vector4(mesh.vertices[idx0].x, mesh.vertices[idx0].y, -mesh.vertices[idx0].z, 1), //注意这儿反转了z坐标
-                    mvp * new Vector4(mesh.vertices[idx1].x, mesh.vertices[idx1].y, -mesh.vertices[idx1].z, 1),
-                    mvp * new Vector4(mesh.vertices[idx2].x, mesh.vertices[idx2].y, -mesh.vertices[idx2].z, 1),
+                    csVertices[idx0],
+                    csVertices[idx1],
+                    csVertices[idx2]                   
                 };
                 
 
@@ -188,6 +205,8 @@ namespace URasterizer
                         continue;
                     }
                 }
+
+                ++_trianglesRendered;
 
 
                 //NDC to screen space, viewport transform
@@ -517,6 +536,11 @@ namespace URasterizer
         {
             texture.SetPixels(frame_buf);
             texture.Apply();
+
+            if (StatDelegate != null)
+            {
+                StatDelegate(_verticesAll, _trianglesAll, _trianglesRendered);
+            }
         }
 
 

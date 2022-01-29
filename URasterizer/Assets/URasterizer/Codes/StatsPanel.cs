@@ -1,18 +1,16 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class StatsPanel : MonoBehaviour
 {
-    // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
+    public Text TrianglesStat;
+    public Text VerticesStat;
 
-    // Update is called once per frame
-    void Update()
+    public void StatDelegate(int vertices, int triangles, int trianglesRendered)
     {
-        
+        TrianglesStat.text = $"Triangles: {trianglesRendered} / {triangles}";
+        VerticesStat.text = $"Vertices: {vertices}";
     }
 }

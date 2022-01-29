@@ -65,7 +65,12 @@ namespace URasterizer
             Debug.Log($"screen size: {w}x{h}");
 
             _rasterizer = new Rasterizer(w, h, _config);
-            rawImg.texture = _rasterizer.texture;            
+            rawImg.texture = _rasterizer.texture;
+
+            var statPanel = this.GetComponent<StatsPanel>();
+            if (statPanel != null) {
+                _rasterizer.StatDelegate += statPanel.StatDelegate;
+            }
         }
 
 
