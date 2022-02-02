@@ -116,9 +116,15 @@ namespace URasterizer
 
         public void SetupViewProjectionMatrix(Camera camera)
         {
+            //左手坐标系转右手坐标系,以下坐标和向量z取反
             var camPos = camera.transform.position;
-            camPos.z *= -1;
-            ViewMatrix = TransformTool.GetViewMatrix(camPos);
+            camPos.z *= -1; 
+            var lookAt = camera.transform.forward;
+            lookAt.z *= -1;
+            var up = camera.transform.up;
+            up.z *= -1;
+            
+            ViewMatrix = TransformTool.GetViewMatrix(camPos, lookAt, up);
 
             if (camera.orthographic)
             {
@@ -298,7 +304,10 @@ namespace URasterizer
             dx1 = Math.Abs(dx);
             dy1 = Math.Abs(dy);
             px = 2 * dy1 - dx1;
-            py = 2 * dx1 - dy1;            
+            py = 2 * dx1 - dy1;
+
+            Color c1 = colorBegin;
+            Color c2 = colorEnd;
 
             if (dy1 <= dx1)
             {
@@ -313,10 +322,11 @@ namespace URasterizer
                     x = x2;
                     y = y2;
                     xe = x1;
+                    c1 = colorEnd;
+                    c2 = colorBegin;
                 }
-                Vector3 point = new Vector3(x, y, 1.0f);
-                Color line_color = dx >= 0 ? colorBegin : colorEnd;
-                SetPixel(point, line_color);
+                Vector3 point = new Vector3(x, y, 1.0f);                 
+                SetPixel(point, c1);
                 for (i = 0; x < xe; i++)
                 {
                     x++;
@@ -338,8 +348,8 @@ namespace URasterizer
                     }
                     
                     Vector3 pt = new Vector3(x, y, 1.0f);
-                    float t = (float)(xe - x) / dx1;
-                    line_color = Color.Lerp(colorBegin, colorEnd, t);                    
+                    float t = 1.0f - (float)(xe - x) / dx1;
+                    Color line_color = Color.Lerp(c1, c2, t);                    
                     SetPixel(pt, line_color);
                 }
             }
@@ -356,10 +366,11 @@ namespace URasterizer
                     x = x2;
                     y = y2;
                     ye = y1;
+                    c1 = colorEnd;
+                    c2 = colorBegin;
                 }
-                Vector3 point = new Vector3(x, y, 1.0f);
-                Color line_color = dy >= 0 ? colorBegin : colorEnd;
-                SetPixel(point, line_color);
+                Vector3 point = new Vector3(x, y, 1.0f);                
+                SetPixel(point, c1);
                 
                 for (i = 0; y < ye; i++)
                 {
@@ -381,8 +392,8 @@ namespace URasterizer
                         py += 2 * (dx1 - dy1);
                     }
                     Vector3 pt = new Vector3(x, y, 1.0f);
-                    float t = (float)(ye - y) / dy1;
-                    line_color = Color.Lerp(colorBegin, colorEnd, t);
+                    float t = 1.0f - (float)(ye - y) / dy1;
+                    Color line_color = Color.Lerp(c1, c2, t);
                     SetPixel(pt, line_color);
                 }
             }

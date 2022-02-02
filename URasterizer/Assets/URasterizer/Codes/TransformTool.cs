@@ -13,18 +13,27 @@ namespace URasterizer
 
     public class TransformTool
     {
-
-
         const float MY_PI = 3.1415926f;
         const float D2R = MY_PI / 180.0f;
 
-        public static Matrix4x4 GetViewMatrix(Vector3 eye_pos)
+        public static Matrix4x4 GetViewMatrix(Vector3 eye_pos, Vector3 lookAtDir, Vector3 upDir)
         {
-            Matrix4x4 view = Matrix4x4.identity;
+            //这儿lookAtDir取反是因为我们使用的view space默认camrea看向(0,0,-1)，因此lookAt会被对应到(0,0,-1)
+            //那么-lookAt就对应到(0,0,1)
+            //我们构造的旋转矩阵是将(0,0,1)变换到-lookAt，其逆矩阵就是将-lookAt变换到(0,0,1)
+            Vector3 camZ = -lookAtDir.normalized;
+            Vector3 camY = upDir.normalized;
+            Vector3 camX = Vector3.Cross(camY, camZ);
+            camY = Vector3.Cross(camZ, camX);
+            Matrix4x4 matRot = Matrix4x4.identity;
+            matRot.SetColumn(0, camX);
+            matRot.SetColumn(1, camY);
+            matRot.SetColumn(2, camZ);
+                        
             Matrix4x4 translate = Matrix4x4.identity;
             translate.SetColumn(3, new Vector4(-eye_pos.x, -eye_pos.y, -eye_pos.z, 1f));
 
-            view = translate * view;
+            Matrix4x4 view = matRot.transpose * translate;
             return view;
         }
 
