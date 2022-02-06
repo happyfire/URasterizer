@@ -8,8 +8,16 @@ public class RenderingConfig : ScriptableObject
     public Color ClearColor = Color.black;
     public bool WireframeMode = false;
     public bool BackfaceCulling = true;
-    public bool MSAA = false;
+    public DisplayBufferType DisplayBuffer = DisplayBufferType.Color;
+    
     
     [Header("Vertex Color Setting")]    
     public Color[] VertexColors;
+}
+
+public enum DisplayBufferType
+{
+    Color,
+    DepthRed,
+    DepthGray
 }

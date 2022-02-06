@@ -43,6 +43,7 @@ namespace URasterizer
 
         Color[] frame_buf;
         float[] depth_buf;
+        Color[] temp_buf;
 
         public Texture2D texture;        
 
@@ -64,6 +65,7 @@ namespace URasterizer
 
             frame_buf = new Color[w * h];
             depth_buf = new float[w * h];
+            temp_buf = new Color[w * h];
 
             texture = new Texture2D(w, h);
             texture.filterMode = FilterMode.Point;
@@ -107,7 +109,7 @@ namespace URasterizer
             }
             if((mask & BufferMask.Depth) == BufferMask.Depth)
             {
-                FillArray(depth_buf, float.MaxValue);
+                FillArray(depth_buf, 0f);
             }
 
             _trianglesAll = _trianglesRendered = 0;
@@ -222,9 +224,16 @@ namespace URasterizer
                     vec.x = 0.5f * _width * (vec.x + 1.0f);
                     vec.y = 0.5f * _height * (vec.y + 1.0f);
 
-                    //GAMES101约定的NDC是右手坐标系，z值范围是[-1,1]，但n为1，f为-1，因此值越大越靠近n。
-                    //为了符合深度值越小离camera越近的惯例，将View space的Z值反转一下，这样后面深度测试的时候就可以使用LESS_EQUAL测试了
-                    vec.z = -vec.z; 
+                    //在硬件渲染中，NDC的z值经过硬件的透视除法之后就直接写入到depth buffer了，如果要调整需要在投影矩阵中调整
+                    //由于我们是软件渲染，所以可以在这里调整z值。                    
+
+                    //GAMES101约定的NDC是右手坐标系，z值范围是[-1,1]，但n为1，f为-1，因此值越大越靠近n。                    
+                    //为了可视化Depth buffer，将最终的z值从[-1,1]映射到[0,1]的范围，因此最终n为1, f为0。离n越近，深度值越大。                    
+                    //由于远处的z值为0，因此clear时深度要清除为0，然后深度测试时，使用GREATER测试。
+                    //(当然我们也可以在这儿反转z值，然后clear时使用1清除，并且深度测试时使用LESS_EQUAL测试)
+                    //注意：这儿的z值调整并不是必要的，只是为了可视化时便于映射为颜色值。其实也可以在可视化的地方调整。
+                    //但是这么调整后，正好和Unity在DirectX平台的Reverse z一样，让near plane附近的z值的浮点数精度提高。
+                    vec.z = vec.z * 0.5f + 0.5f; 
 
                     v[k] = vec;
                 }
@@ -469,9 +478,9 @@ namespace URasterizer
                             float w_reciprocal = 1.0f / (alpha / v[0].w + beta / v[1].w + gamma / v[2].w);
                             float z_interpolated = alpha * v[0].z / v[0].w + beta * v[1].z / v[1].w + gamma * v[2].z / v[2].w;
                             z_interpolated *= w_reciprocal;
-                            //深度测试
+                            //深度测试(注意我们这儿的z值越大越靠近near plane，因此大值通过测试）
                             int index = GetIndex(x, y);
-                            if(z_interpolated <= depth_buf[index])
+                            if(z_interpolated > depth_buf[index])
                             {
                                 depth_buf[index] = z_interpolated;
                                 
@@ -545,7 +554,30 @@ namespace URasterizer
 
         public void UpdateFrame()
         {
-            texture.SetPixels(frame_buf);
+            switch (_config.DisplayBuffer)
+            {
+                case DisplayBufferType.Color:
+                    texture.SetPixels(frame_buf);
+                    break;
+                case DisplayBufferType.DepthRed:
+                case DisplayBufferType.DepthGray:
+                    for (int i = 0; i < depth_buf.Length; ++i)
+                    {
+                        //depth_buf中的值范围是[0,1]，且最近处为1，最远处为0。因此可视化后背景是黑色
+                        float c = depth_buf[i]; 
+                        if(_config.DisplayBuffer == DisplayBufferType.DepthRed)
+                        {
+                            temp_buf[i] = new Color(c, 0, 0);
+                        }
+                        else
+                        {
+                            temp_buf[i] = new Color(c, c, c);
+                        }                        
+                    }
+                    texture.SetPixels(temp_buf);
+                    break;
+            }                                
+            
             texture.Apply();
 
             if (StatDelegate != null)

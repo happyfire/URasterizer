@@ -12,10 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5fa123a60a768444af03a384cb34a74, type: 3}
   m_Name: RenderingConfig
   m_EditorClassIdentifier: 
-  ClearColor: {r: 0, g: 0.7450409, b: 1, a: 0.47058824}
+  ClearColor: {r: 0, g: 0, b: 0, a: 0.5058824}
   WireframeMode: 0
   BackfaceCulling: 1
-  MSAA: 0
+  DisplayBuffer: 0
   VertexColors:
   - {r: 1, g: 0, b: 0, a: 1}
   - {r: 0, g: 1, b: 0, a: 1}
