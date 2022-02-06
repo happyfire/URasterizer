@@ -159,7 +159,7 @@ namespace URasterizer
             //2. 三角形顶点环绕方向从顺时针改成逆时针
 
 
-            //vertex shader
+            /// ------------- Vertex Shader -------------------
             Vector4[] csVertices = new Vector4[mesh.vertexCount]; //clip space vertices
             for(int i=0; i<mesh.vertexCount; ++i)
             {                
@@ -170,7 +170,9 @@ namespace URasterizer
 
             var indices = mesh.triangles;
             for(int i=0; i< indices.Length; i+=3)
-            {                
+            {         
+                /// -------------- Primitive Assembly -----------------
+
                 //注意这儿对调了v0和v1的索引，因为原来的 0,1,2是顺时针的，对调后是 1,0,2是逆时针的
                 //Unity Quard模型的两个三角形索引分别是 0,3,1,3,0,2 转换后为 3,0,1,0,3,2
                 int idx0 = indices[i+1];
@@ -185,14 +187,15 @@ namespace URasterizer
                 };
                 
 
-                //do clipping
+                // ------ Clipping -------
                 if (Clipped(v))
                 {
                     continue;
-                }               
-                
-                //clip space to NDC (Perspective division)                 
-                for(int k=0; k<3; k++)
+                }
+
+                // ------- Perspective division --------
+                //clip space to NDC
+                for (int k=0; k<3; k++)
                 {
                     v[k].x /= v[k].w;
                     v[k].y /= v[k].w;
@@ -216,8 +219,8 @@ namespace URasterizer
 
                 ++_trianglesRendered;
 
-
-                //NDC to screen space, viewport transform
+                // ------- Viewport Transform ----------
+                //NDC to screen space
                 for (int k = 0; k < 3; k++)
                 {
                     var vec = v[k];
@@ -260,7 +263,7 @@ namespace URasterizer
                     t.SetColor(2, Color.white);
                 }                             
 
-                //Rasterization
+                /// ---------- Rasterization -----------
                 if (_config.WireframeMode)
                 {
                     RasterizeWireframe(t);
@@ -299,6 +302,7 @@ namespace URasterizer
         }
 
         #region Wireframe mode
+        //Breshham算法画线,颜色使用线性插值（非透视校正）
         private void DrawLine(Vector3 begin, Vector3 end, Color colorBegin, Color colorEnd)
         {            
             int x1 = Mathf.FloorToInt(begin.x);
