@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: RenderingConfig
   m_EditorClassIdentifier: 
   ClearColor: {r: 0, g: 0, b: 0, a: 0.5058824}
-  WireframeMode: 0
+  WireframeMode: 1
   BackfaceCulling: 1
   DisplayBuffer: 0
   VertexColors:

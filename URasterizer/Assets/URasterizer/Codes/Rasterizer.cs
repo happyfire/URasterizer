@@ -233,7 +233,7 @@ namespace URasterizer
                     //GAMES101约定的NDC是右手坐标系，z值范围是[-1,1]，但n为1，f为-1，因此值越大越靠近n。                    
                     //为了可视化Depth buffer，将最终的z值从[-1,1]映射到[0,1]的范围，因此最终n为1, f为0。离n越近，深度值越大。                    
                     //由于远处的z值为0，因此clear时深度要清除为0，然后深度测试时，使用GREATER测试。
-                    //(当然我们也可以在这儿反转z值，然后clear时使用1清除，并且深度测试时使用LESS_EQUAL测试)
+                    //(当然我们也可以在这儿反转z值，然后clear时使用float.MaxValue清除，并且深度测试时使用LESS_EQUAL测试)
                     //注意：这儿的z值调整并不是必要的，只是为了可视化时便于映射为颜色值。其实也可以在可视化的地方调整。
                     //但是这么调整后，正好和Unity在DirectX平台的Reverse z一样，让near plane附近的z值的浮点数精度提高。
                     vec.z = vec.z * 0.5f + 0.5f; 
@@ -274,8 +274,14 @@ namespace URasterizer
                 }
                 
             }
-        }
+        }        
 
+        //三角形Clipping操作，对于部分在clipping volume中的图元，
+        //硬件实现时一般只对部分顶点z值在near,far之间的图元进行clipping操作，
+        //而部分顶点x,y值在x,y裁剪平面之间的图元则不进行裁剪，只是通过一个比viewport更大一些的guard-band区域进行整体剔除（相当于放大x,y的测试范围）
+        //这样x,y裁剪平面之间的图元最终在frame buffer上进行Scissor测试。
+        //此处的实现简化为只整体剔除，不做任何clipping操作。对于x,y裁剪没问题，虽然没扩大region,也可以最后在frame buffer上裁剪掉。
+        //对于z的裁剪由于没有处理，会看到整个三角形消失导致的边缘不齐整
         bool Clipped(Vector4[] v)
         {
             //Clip space使用GAMES101规范，右手坐标系，n为+1， f为-1
@@ -286,7 +292,7 @@ namespace URasterizer
                 var vertex = v[i];
                 var w = vertex.w;
                 w = w >= 0 ? w : -w; //由于NDC中总是满足-1<=Zndc<=1, 而当 w < 0 时，-w >= Zclip = Zndc*w >= w。所以此时clip space的坐标范围是[w,-w], 为了比较时更明确，将w取正
-                //Debug.LogError("w=" + w);
+                
                 bool inside = (vertex.x <= w && vertex.x >= -w
                     && vertex.y <= w && vertex.y >= -w
                     && vertex.z <= w && vertex.z >= -w);
@@ -478,19 +484,20 @@ namespace URasterizer
                             float alpha = c.x;
                             float beta = c.y;
                             float gamma = c.z;
-                            //透视校正插值
-                            float w_reciprocal = 1.0f / (alpha / v[0].w + beta / v[1].w + gamma / v[2].w);
-                            float z_interpolated = alpha * v[0].z / v[0].w + beta * v[1].z / v[1].w + gamma * v[2].z / v[2].w;
-                            z_interpolated *= w_reciprocal;
+                            //透视校正插值，z为透视校正插值后的view space z值
+                            float z = 1.0f / (alpha / v[0].w + beta / v[1].w + gamma / v[2].w);
+                            //zp为透视校正插值后的screen space z值
+                            float zp = (alpha * v[0].z / v[0].w + beta * v[1].z / v[1].w + gamma * v[2].z / v[2].w) * z;
+                            
                             //深度测试(注意我们这儿的z值越大越靠近near plane，因此大值通过测试）
                             int index = GetIndex(x, y);
-                            if(z_interpolated > depth_buf[index])
+                            if(zp > depth_buf[index])
                             {
-                                depth_buf[index] = z_interpolated;
-                                
-                                Color color_interpolated = alpha * t.Colors[0] / v[0].w + beta * t.Colors[1] / v[1].w + gamma * t.Colors[2] / v[2].w;
-                                color_interpolated *= w_reciprocal;
-                                frame_buf[index] = color_interpolated;
+                                depth_buf[index] = zp;
+
+                                //透视校正插值
+                                Color color_p = (alpha * t.Colors[0] / v[0].w + beta * t.Colors[1] / v[1].w + gamma * t.Colors[2] / v[2].w) * z;                                
+                                frame_buf[index] = color_p;
                             }
                         }                        
                     }
