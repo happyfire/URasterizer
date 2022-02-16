@@ -9,6 +9,7 @@ public class RenderingConfig : ScriptableObject
     public bool WireframeMode = false;
     public bool BackfaceCulling = true;
     public DisplayBufferType DisplayBuffer = DisplayBufferType.Color;
+    public MSAALevel MSAA = MSAALevel.Disabled;
     
     
     [Header("Vertex Color Setting")]    
@@ -20,4 +21,11 @@ public enum DisplayBufferType
     Color,
     DepthRed,
     DepthGray
+}
+
+public enum MSAALevel
+{
+    Disabled,
+    X2 = 2,
+    X4 = 4
 }
