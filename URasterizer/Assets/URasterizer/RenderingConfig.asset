@@ -12,9 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5fa123a60a768444af03a384cb34a74, type: 3}
   m_Name: RenderingConfig
   m_EditorClassIdentifier: 
-  ClearColor: {r: 0, g: 0, b: 0, a: 0.49803922}
+  ClearColor: {r: 0, g: 0, b: 0, a: 1}
   WireframeMode: 0
   BackfaceCulling: 1
   DisplayBuffer: 0
   MSAA: 0
+  BilinearSample: 1
+  FragmentShaderType: 1
+  AmbientColor: {r: 0.0754717, g: 0.075044505, b: 0.075044505, a: 1}
   VertexColors: {fileID: 11400000, guid: a126a2fdc8a60c54e8a3aadb7db4bb3a, type: 2}

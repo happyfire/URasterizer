@@ -62,6 +62,7 @@
     <Compile Include="Assets\URasterizer\Codes\TransformTool.cs" />
     <Compile Include="Assets\URasterizer\Codes\HandmakeMesh.cs" />
     <Compile Include="Assets\URasterizer\Codes\VertexColors.cs" />
+    <Compile Include="Assets\URasterizer\Codes\FragmentShader.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\URasterizer\DefaultShader.shader" />

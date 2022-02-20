@@ -8,7 +8,7 @@ namespace URasterizer
     {
         Color = 1,
         Depth = 2
-    }
+    }    
 
     public delegate void OnRasterizerStatUpdate(int verticesAll, int trianglesAll, int trianglesRendered);
 
@@ -49,7 +49,9 @@ namespace URasterizer
         bool[] samplers_mask_MSAA;
         float[] samplers_depth_MSAA;
 
-        public Texture2D texture;        
+        public Texture2D texture;
+
+        public FragmentShader CurrentFragmentShader;
 
         //Stats
         int _trianglesAll, _trianglesRendered;
@@ -187,6 +189,7 @@ namespace URasterizer
             ModelMatrix = ro.GetModelMatrix();                      
 
             Matrix4x4 mvp = _matProjection * _matView * _matModel;
+            Matrix4x4 normalMat = _matModel.inverse.transpose;
 
             _verticesAll += mesh.vertexCount;
             _trianglesAll += mesh.triangles.Length / 3;
@@ -198,10 +201,20 @@ namespace URasterizer
 
             /// ------------- Vertex Shader -------------------
             Vector4[] csVertices = new Vector4[mesh.vertexCount]; //clip space vertices
+            Vector3[] wsVertices = new Vector3[mesh.vertexCount]; //world space vertices
+            Vector3[] osNormals = new Vector3[mesh.vertexCount]; //obj space normals
+            Vector3[] wsNormals = new Vector3[mesh.vertexCount]; //world space normals
+
             for(int i=0; i<mesh.vertexCount; ++i)
             {                
-                var vert = mesh.vertices[i];              
-                csVertices[i] = mvp * new Vector4(vert.x, vert.y, -vert.z, 1); //注意这儿反转了z坐标
+                var vert = mesh.vertices[i];        
+                var objVert = new Vector4(vert.x, vert.y, -vert.z, 1); //注意这儿反转了z坐标
+                csVertices[i] = mvp * objVert;
+                wsVertices[i] = _matModel * objVert;
+                var normal = mesh.normals[i];
+                var objNormal = new Vector3(normal.x, normal.y, -normal.z);
+                osNormals[i] = objNormal;
+                wsNormals[i] = _matModel * objNormal;
             }
 
 
@@ -281,8 +294,13 @@ namespace URasterizer
                 Triangle t = new Triangle();
                 for(int k=0; k<3; k++)
                 {
-                    t.SetPosition(k, v[k]);                    
+                    t.SetPosition(k, v[k]);                       
                 }
+
+                //set obj normal
+                t.SetNormal(0, osNormals[idx0]);
+                t.SetNormal(1, osNormals[idx1]);
+                t.SetNormal(2, osNormals[idx2]);
 
                 if (mesh.uv.Length > 0)
                 {
@@ -312,7 +330,15 @@ namespace URasterizer
                     t.SetColor(0, Color.white);
                     t.SetColor(1, Color.white);
                     t.SetColor(2, Color.white);
-                }                             
+                }
+
+                //set world space pos & normal
+                t.SetWorldPos(0, wsVertices[idx0]);
+                t.SetWorldPos(1, wsVertices[idx1]);
+                t.SetWorldPos(2, wsVertices[idx2]);
+                t.SetWorldNormal(0, wsNormals[idx0]);
+                t.SetWorldNormal(1, wsNormals[idx1]);
+                t.SetWorldNormal(2, wsNormals[idx2]);
 
                 /// ---------- Rasterization -----------
                 if (_config.WireframeMode)
@@ -582,19 +608,25 @@ namespace URasterizer
                                 depth_buf[index] = zp;
 
                                 //透视校正插值
-                                Color color_p = (alpha * t.Colors[0] / v[0].w + beta * t.Colors[1] / v[1].w + gamma * t.Colors[2] / v[2].w) * z;                                
-                                
-                                if(ro != null && ro.texture != null)
-                                {
-                                    Vector2 uv = (alpha * t.TexCoords[0] / v[0].w + beta * t.TexCoords[1] / v[1].w + gamma * t.TexCoords[2] / v[2].w) * z;
+                                Color color_p = (alpha * t.Colors[0] / v[0].w + beta * t.Colors[1] / v[1].w + gamma * t.Colors[2] / v[2].w) * z;
+                                Vector2 uv_p = (alpha * t.TexCoords[0] / v[0].w + beta * t.TexCoords[1] / v[1].w + gamma * t.TexCoords[2] / v[2].w) * z;
+                                Vector3 normal_p = (alpha * t.Normals[0] / v[0].w + beta * t.Normals[1] / v[1].w + gamma * t.Normals[2] / v[2].w) * z;
+                                Vector3 worldPos_p = (alpha * t.WorldPoses[0] / v[0].w + beta * t.WorldPoses[1] / v[1].w + gamma * t.WorldPoses[2] / v[2].w) * z;
+                                Vector3 worldNormal_p = (alpha * t.WorldNormals[0] / v[0].w + beta * t.WorldNormals[1] / v[1].w + gamma * t.WorldNormals[2] / v[2].w) * z;
 
-                                    //frame_buf[index] = ro.texture.GetPixelBilinear(uv.x, uv.y);                                    
-                                    frame_buf[index] = ro.texture.GetPixel((int)(ro.texture.width * uv.x), (int)(ro.texture.height * uv.y));
-                                }
-                                else
+                                if (CurrentFragmentShader != null)
                                 {
-                                    frame_buf[index] = color_p;
+                                    FragmentShaderInputData input = new FragmentShaderInputData();
+                                    input.Color = color_p;
+                                    input.UV = uv_p;
+                                    input.Texture = ro.texture;
+                                    input.LocalNormal = normal_p;
+                                    input.WorldPos = worldPos_p;
+                                    input.WorldNormal = worldNormal_p;
+
+                                    frame_buf[index] = CurrentFragmentShader(input);
                                 }
+                                
 
                                 
                             }

@@ -14,6 +14,10 @@ namespace URasterizer
         private List<RenderingObject> renderingObjects = new List<RenderingObject>();
         
         private Camera _camera;
+
+        [SerializeField]
+        private Light _mainLight;
+
         public RenderingConfig _config;
 
         private void Start()
@@ -79,7 +83,35 @@ namespace URasterizer
             var r = _rasterizer;
             r.Clear(BufferMask.Color | BufferMask.Depth);
 
-            for(int i=0; i<renderingObjects.Count; ++i)
+            switch (_config.FragmentShaderType)
+            {
+                case ShaderType.VertexColor:
+                    r.CurrentFragmentShader = ShaderContext.FSVertexColor;
+                    break;
+                case ShaderType.BlinnPhong:
+                    r.CurrentFragmentShader = ShaderContext.FSBlinnPhong;
+                    break;
+                case ShaderType.NormalVisual:
+                    r.CurrentFragmentShader = ShaderContext.FSNormalVisual;
+                    break;
+                default:
+                    r.CurrentFragmentShader = ShaderContext.FSBlinnPhong;
+                    break;
+            }
+
+            ShaderContext.Config = _config;
+
+            var camPos = transform.position;
+            camPos.z *= -1;
+            ShaderContext.Uniforms.WorldSpaceCameraPos = camPos;            
+
+            var lightDir = _mainLight.transform.forward;
+            lightDir.z *= -1;
+            ShaderContext.Uniforms.WorldSpaceLightDir = -lightDir;
+            ShaderContext.Uniforms.LightColor = _mainLight.color * _mainLight.intensity;
+            ShaderContext.Uniforms.AmbientColor = _config.AmbientColor;
+
+            for (int i=0; i<renderingObjects.Count; ++i)
             {
                 if (renderingObjects[i].gameObject.activeInHierarchy)
                 {

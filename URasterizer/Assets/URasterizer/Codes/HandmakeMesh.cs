@@ -24,9 +24,10 @@ namespace URasterizer
             {
                 vertices = Vertices,
                 triangles = Indices,                
-            };            
+            };
+            _mesh.RecalculateNormals();
 
-            if(VertexColors != null && VertexColors.Colors.Length > 0)
+            if (VertexColors != null && VertexColors.Colors.Length > 0)
             {
                 Color[] colors = new Color[_mesh.vertexCount];
                 int colorCnts = VertexColors.Colors.Length;
@@ -35,7 +36,7 @@ namespace URasterizer
                     colors[i] = VertexColors.Colors[i % colorCnts];
                 }
                 _mesh.SetColors(colors);
-            }
+            }            
             
             var ro = gameObject.AddComponent<RenderingObject>();
             ro.mesh = _mesh;
