@@ -41,7 +41,7 @@ namespace URasterizer
             
 
             //手动设置的mesh
-            {                
+            if(false){                
                 //手动模型也使用左手系
                 var _mesh = new Mesh
                 {

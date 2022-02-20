@@ -200,7 +200,7 @@ namespace URasterizer
             Vector4[] csVertices = new Vector4[mesh.vertexCount]; //clip space vertices
             for(int i=0; i<mesh.vertexCount; ++i)
             {                
-                var vert = mesh.vertices[i];                
+                var vert = mesh.vertices[i];              
                 csVertices[i] = mvp * new Vector4(vert.x, vert.y, -vert.z, 1); //注意这儿反转了z坐标
             }
 
@@ -221,7 +221,7 @@ namespace URasterizer
                     csVertices[idx0],
                     csVertices[idx1],
                     csVertices[idx2]                   
-                };
+                };                
                 
 
                 // ------ Clipping -------
@@ -278,20 +278,34 @@ namespace URasterizer
                     v[k] = vec;
                 }
 
-             
                 Triangle t = new Triangle();
                 for(int k=0; k<3; k++)
                 {
-                    t.SetPosition(k, v[k]);
+                    t.SetPosition(k, v[k]);                    
                 }
 
-                //设置顶点色,使用config中的颜色数组循环设置
-                int vertexColorCount = _config.VertexColors.Length;
-                if(vertexColorCount > 0)
+                if (mesh.uv.Length > 0)
                 {
-                    t.SetColor(0, _config.VertexColors[idx0 % vertexColorCount]);
-                    t.SetColor(1, _config.VertexColors[idx1 % vertexColorCount]);
-                    t.SetColor(2, _config.VertexColors[idx2 % vertexColorCount]);
+                    Vector2[] uv =
+                    {
+                        mesh.uv[idx0],
+                        mesh.uv[idx1],
+                        mesh.uv[idx2]
+                    };
+                    for (int k = 0; k < 3; k++)
+                    {                        
+                        t.SetTexCoord(k, uv[k]);
+                    }
+                }
+
+                //设置顶点色,使用config中的颜色数组循环设置                
+                if(_config.VertexColors != null && _config.VertexColors.Colors.Length > 0)
+                {
+                    int vertexColorCount = _config.VertexColors.Colors.Length;
+
+                    t.SetColor(0, _config.VertexColors.Colors[idx0 % vertexColorCount]);
+                    t.SetColor(1, _config.VertexColors.Colors[idx1 % vertexColorCount]);
+                    t.SetColor(2, _config.VertexColors.Colors[idx2 % vertexColorCount]);
                 }
                 else
                 {
@@ -307,7 +321,7 @@ namespace URasterizer
                 }
                 else
                 {
-                    RasterizeTriangle(t);
+                    RasterizeTriangle(t, ro);
                 }
                 
             }
@@ -502,7 +516,7 @@ namespace URasterizer
         
 
         //Screen space  rasterization
-        void RasterizeTriangle(Triangle t)
+        void RasterizeTriangle(Triangle t, RenderingObject ro)
         {
             var v = t.Positions;
             
@@ -563,13 +577,26 @@ namespace URasterizer
                             
                             //深度测试(注意我们这儿的z值越大越靠近near plane，因此大值通过测试）
                             int index = GetIndex(x, y);
-                            if(zp > depth_buf[index])
+                            if(zp >= depth_buf[index])
                             {
                                 depth_buf[index] = zp;
 
                                 //透视校正插值
                                 Color color_p = (alpha * t.Colors[0] / v[0].w + beta * t.Colors[1] / v[1].w + gamma * t.Colors[2] / v[2].w) * z;                                
-                                frame_buf[index] = color_p;
+                                
+                                if(ro != null && ro.texture != null)
+                                {
+                                    Vector2 uv = (alpha * t.TexCoords[0] / v[0].w + beta * t.TexCoords[1] / v[1].w + gamma * t.TexCoords[2] / v[2].w) * z;
+
+                                    //frame_buf[index] = ro.texture.GetPixelBilinear(uv.x, uv.y);                                    
+                                    frame_buf[index] = ro.texture.GetPixel((int)(ro.texture.width * uv.x), (int)(ro.texture.height * uv.y));
+                                }
+                                else
+                                {
+                                    frame_buf[index] = color_p;
+                                }
+
+                                
                             }
                         }                        
                     }

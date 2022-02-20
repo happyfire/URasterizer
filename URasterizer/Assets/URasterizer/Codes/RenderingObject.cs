@@ -7,15 +7,21 @@ namespace URasterizer
     {        
         public Mesh mesh;
         public bool DoubleSideRendering;
+        public Texture2D texture;
 
-        private void Awake()
+        private void Start()
         {
             var meshFilter = GetComponent<MeshFilter>();
             if(meshFilter != null)
             {
                 mesh = meshFilter.mesh;
             }
-        }    
+            var meshRenderer = GetComponent<MeshRenderer>();             
+            if (meshRenderer != null && meshRenderer.sharedMaterial!=null)
+            {
+                texture = meshRenderer.sharedMaterial.mainTexture as Texture2D;
+            }
+        }  
 
         // TRS
         public Matrix4x4 GetModelMatrix()

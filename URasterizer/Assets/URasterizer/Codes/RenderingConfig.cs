@@ -10,10 +10,10 @@ public class RenderingConfig : ScriptableObject
     public bool BackfaceCulling = true;
     public DisplayBufferType DisplayBuffer = DisplayBufferType.Color;
     public MSAALevel MSAA = MSAALevel.Disabled;
-    
-    
-    [Header("Vertex Color Setting")]    
-    public Color[] VertexColors;
+
+
+    [Header("Vertex Color Setting")]
+    public VertexColors VertexColors;    
 }
 
 public enum DisplayBufferType
