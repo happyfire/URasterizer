@@ -43,25 +43,7 @@ namespace URasterizer
             
             Debug.Log($"Find rendering objs count:{renderingObjects.Count}");
             
-
-            //手动设置的mesh
-            if(false){                
-                //手动模型也使用左手系
-                var _mesh = new Mesh
-                {
-                    vertices = new Vector3[] { new Vector3(1f, 0f, 2f), new Vector3(0f, 2f, 2f), new Vector3(-1f, 0f, 2f),
-                            new Vector3(1.5f, 0.5f, 1.5f), new Vector3(0.5f, 2.5f, 1.5f), new Vector3(-0.5f, 0.5f, 1.5f)},
-                    triangles = new int[] { 0, 2, 1, 3, 5, 4 }
-                };
-                var go = new GameObject("_handmake_mesh_");
-                var ro = go.AddComponent<RenderingObject>();
-                ro.mesh = _mesh;
-                go.AddComponent<MeshFilter>().mesh = _mesh;
-                go.AddComponent<MeshRenderer>();
-
-                renderingObjects.Add(ro);
-            }
-
+            
             RectTransform rect = rawImg.GetComponent<RectTransform>();
             rect.sizeDelta = new Vector2(Screen.width, Screen.height);
             int w = Mathf.FloorToInt(rect.rect.width);

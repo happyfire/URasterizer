@@ -4,6 +4,8 @@ using UnityEngine;
 
 namespace URasterizer
 {
+    //手动设置的mesh            
+    //手动模型也使用左手系
     public class HandmakeMesh : MonoBehaviour
     {
         public Vector3[] Vertices = { 
