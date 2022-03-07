@@ -1,0 +1,29 @@
+
+#pragma kernel CSMain
+
+struct OutBuf
+{
+    float4 clipPos;
+    float3 worldPos;
+    float3 objectNormal;
+    float3 worldNormal;
+};
+
+
+float4x4 matMVP;
+float4x4 matModel;
+
+
+StructuredBuffer<float3> vertexBuffer;
+StructuredBuffer<float3> normalBuffer;
+RWStructuredBuffer<OutBuf> outBuffer;
+
+[numthreads(256,1,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    float4 pos = float4(vertexBuffer[id.x].x, vertexBuffer[id.x].y, -vertexBuffer[id.x].z, 1.0f);
+    outBuffer[id.x].clipPos = mul(matMVP, pos);      
+    outBuffer[id.x].worldPos = mul(matModel, pos.xyz);      
+    outBuffer[id.x].objectNormal = float3(normalBuffer[id.x].x, normalBuffer[id.x].y, -normalBuffer[id.x].z);    
+    outBuffer[id.x].worldNormal = mul(matModel, outBuffer[id.x].objectNormal);      
+}

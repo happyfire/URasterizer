@@ -21,3 +21,5 @@ MonoBehaviour:
   FragmentShaderType: 1
   AmbientColor: {r: 0.0754717, g: 0.075044505, b: 0.075044505, a: 1}
   VertexColors: {fileID: 11400000, guid: a126a2fdc8a60c54e8a3aadb7db4bb3a, type: 2}
+  UseComputeShader: 0
+  VertexShader: {fileID: 7200000, guid: caa96f337395ad9449e1be41546efcd6, type: 3}

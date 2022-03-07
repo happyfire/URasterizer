@@ -4,6 +4,14 @@ using UnityEngine;
 
 namespace URasterizer
 {
+    struct OutBuf
+    {
+        public Vector4 clipPos;
+        public Vector3 worldPos;
+        public Vector3 objectNormal;
+        public Vector3 worldNormal;
+    }
+
     public enum BufferMask
     {
         Color = 1,
@@ -205,17 +213,53 @@ namespace URasterizer
             Vector3[] osNormals = new Vector3[mesh.vertexCount]; //obj space normals
             Vector3[] wsNormals = new Vector3[mesh.vertexCount]; //world space normals
 
-            for(int i=0; i<mesh.vertexCount; ++i)
-            {                
-                var vert = mesh.vertices[i];        
-                var objVert = new Vector4(vert.x, vert.y, -vert.z, 1); //注意这儿反转了z坐标
-                csVertices[i] = mvp * objVert;
-                wsVertices[i] = _matModel * objVert;
-                var normal = mesh.normals[i];
-                var objNormal = new Vector3(normal.x, normal.y, -normal.z);
-                osNormals[i] = objNormal;
-                wsNormals[i] = _matModel * objNormal;
+            if(_config.UseComputeShader && _config.VertexShader != null){
+                ComputeBuffer vertexBuffer = new ComputeBuffer(mesh.vertexCount, 3*4);
+                vertexBuffer.SetData(mesh.vertices);
+                ComputeBuffer normalBuffer = new ComputeBuffer(mesh.vertexCount, 3*4);
+                normalBuffer.SetData(mesh.normals);
+                ComputeBuffer outBuffer = new ComputeBuffer(mesh.vertexCount, 13*4);
+                
+
+                var shader = _config.VertexShader;
+                int kernel = shader.FindKernel("CSMain");
+                shader.SetMatrix("matMVP", mvp);
+                shader.SetMatrix("matModel", _matModel);
+                shader.SetBuffer(kernel, "vertexBuffer", vertexBuffer);
+                shader.SetBuffer(kernel,"normalBuffer", normalBuffer);
+                shader.SetBuffer(kernel, "outBuffer", outBuffer);
+                
+                int groupCnt = mesh.vertexCount/256;
+                groupCnt = groupCnt==0? 1: groupCnt;
+                shader.Dispatch(kernel, groupCnt, 1, 1);  
+
+                OutBuf[] output = new OutBuf[mesh.vertexCount];
+                outBuffer.GetData(output);  
+
+                for(int i=0; i<mesh.vertexCount; ++i)
+                {
+                    csVertices[i] = output[i].clipPos;
+                    wsVertices[i] = output[i].worldPos;
+                    osNormals[i] = output[i].objectNormal;
+                    wsNormals[i] = output[i].worldNormal;
+                }                
+                    
             }
+            else{
+                for(int i=0; i<mesh.vertexCount; ++i)
+                {                
+                    var vert = mesh.vertices[i];        
+                    var objVert = new Vector4(vert.x, vert.y, -vert.z, 1); //注意这儿反转了z坐标
+                    csVertices[i] = mvp * objVert;
+                    wsVertices[i] = _matModel * objVert;
+                    var normal = mesh.normals[i];
+                    var objNormal = new Vector3(normal.x, normal.y, -normal.z);
+                    osNormals[i] = objNormal;
+                    wsNormals[i] = _matModel * objNormal;
+                }
+            }
+
+            
 
 
             var indices = mesh.triangles;

@@ -17,6 +17,10 @@ namespace URasterizer {
     
         [Header("Vertex Color Setting")]
         public VertexColors VertexColors;
+
+        [Header("Compute Shaders")]
+        public bool UseComputeShader;
+        public ComputeShader VertexShader;
     }
 
     public enum DisplayBufferType
