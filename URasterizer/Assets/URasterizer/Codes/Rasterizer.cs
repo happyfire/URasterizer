@@ -4,12 +4,12 @@ using UnityEngine;
 
 namespace URasterizer
 {
-    struct OutBuf
+    struct VSOutBuf
     {
-        public Vector4 clipPos;
-        public Vector3 worldPos;
-        public Vector3 objectNormal;
-        public Vector3 worldNormal;
+        public Vector4 clipPos; //clip space vertices
+        public Vector3 worldPos; //world space vertices
+        public Vector3 objectNormal; //obj space normals
+        public Vector3 worldNormal; //world space normals
     }
 
     public enum BufferMask
@@ -66,6 +66,10 @@ namespace URasterizer
         int _verticesAll;
 
         public OnRasterizerStatUpdate StatDelegate;
+
+        //优化GC
+        Vector4[] _tmpVector4s = new Vector4[3];
+        Vector3[] _tmpVector3s = new Vector3[3];
 
 
         public Rasterizer(int w, int h, RenderingConfig config)
@@ -192,6 +196,13 @@ namespace URasterizer
         public void Draw(RenderingObject ro, Camera camera)
         {
             Mesh mesh = ro.mesh;
+            if(ro.meshVertices==null){               
+                ro.meshVertices = mesh.vertices;
+                ro.meshNormals = mesh.normals;
+                ro.triangles = mesh.triangles;
+                ro.uvs = mesh.uv;
+            }
+
             SetupViewProjectionMatrix(camera);
 
             ModelMatrix = ro.GetModelMatrix();                      
@@ -200,7 +211,8 @@ namespace URasterizer
             Matrix4x4 normalMat = _matModel.inverse.transpose;
 
             _verticesAll += mesh.vertexCount;
-            _trianglesAll += mesh.triangles.Length / 3;
+            _trianglesAll += ro.triangles.Length / 3;
+            
 
             //Unity模型本地坐标系也是左手系，需要转成我们使用的右手系
             //1. z轴反转
@@ -208,16 +220,13 @@ namespace URasterizer
 
 
             /// ------------- Vertex Shader -------------------
-            Vector4[] csVertices = new Vector4[mesh.vertexCount]; //clip space vertices
-            Vector3[] wsVertices = new Vector3[mesh.vertexCount]; //world space vertices
-            Vector3[] osNormals = new Vector3[mesh.vertexCount]; //obj space normals
-            Vector3[] wsNormals = new Vector3[mesh.vertexCount]; //world space normals
+            VSOutBuf[] vsOutput = new VSOutBuf[mesh.vertexCount];                     
 
             if(_config.UseComputeShader && _config.VertexShader != null){
                 ComputeBuffer vertexBuffer = new ComputeBuffer(mesh.vertexCount, 3*4);
-                vertexBuffer.SetData(mesh.vertices);
+                vertexBuffer.SetData(ro.meshVertices);
                 ComputeBuffer normalBuffer = new ComputeBuffer(mesh.vertexCount, 3*4);
-                normalBuffer.SetData(mesh.normals);
+                normalBuffer.SetData(ro.meshNormals);
                 ComputeBuffer outBuffer = new ComputeBuffer(mesh.vertexCount, 13*4);
                 
 
@@ -232,37 +241,32 @@ namespace URasterizer
                 int groupCnt = mesh.vertexCount/256;
                 groupCnt = groupCnt==0? 1: groupCnt;
                 shader.Dispatch(kernel, groupCnt, 1, 1);  
+                
+                outBuffer.GetData(vsOutput);      
 
-                OutBuf[] output = new OutBuf[mesh.vertexCount];
-                outBuffer.GetData(output);  
-
-                for(int i=0; i<mesh.vertexCount; ++i)
-                {
-                    csVertices[i] = output[i].clipPos;
-                    wsVertices[i] = output[i].worldPos;
-                    osNormals[i] = output[i].objectNormal;
-                    wsNormals[i] = output[i].worldNormal;
-                }                
-                    
+                vertexBuffer.Dispose();
+                normalBuffer.Dispose();
+                outBuffer.Dispose();                                           
             }
             else{
+                
                 for(int i=0; i<mesh.vertexCount; ++i)
                 {                
-                    var vert = mesh.vertices[i];        
+                    var vert = ro.meshVertices[i];        
                     var objVert = new Vector4(vert.x, vert.y, -vert.z, 1); //注意这儿反转了z坐标
-                    csVertices[i] = mvp * objVert;
-                    wsVertices[i] = _matModel * objVert;
-                    var normal = mesh.normals[i];
+                    vsOutput[i].clipPos = mvp * objVert;
+                    vsOutput[i].worldPos = _matModel * objVert;
+                    var normal = ro.meshNormals[i];
                     var objNormal = new Vector3(normal.x, normal.y, -normal.z);
-                    osNormals[i] = objNormal;
-                    wsNormals[i] = _matModel * objNormal;
+                    vsOutput[i].objectNormal = objNormal;
+                    vsOutput[i].worldNormal = _matModel * objNormal;
                 }
             }
 
             
 
 
-            var indices = mesh.triangles;
+            var indices = ro.triangles;
             for(int i=0; i< indices.Length; i+=3)
             {         
                 /// -------------- Primitive Assembly -----------------
@@ -271,21 +275,19 @@ namespace URasterizer
                 //Unity Quard模型的两个三角形索引分别是 0,3,1,3,0,2 转换后为 3,0,1,0,3,2
                 int idx0 = indices[i+1];
                 int idx1 = indices[i]; 
-                int idx2 = indices[i+2];
-                             
-                Vector4[] v =
-                {
-                    csVertices[idx0],
-                    csVertices[idx1],
-                    csVertices[idx2]                   
-                };                
-                
+                int idx2 = indices[i+2];  
 
+                var v = _tmpVector4s;                                           
+                
+                v[0] = vsOutput[idx0].clipPos;
+                v[1] = vsOutput[idx1].clipPos;
+                v[2] = vsOutput[idx2].clipPos;                                  
+                
                 // ------ Clipping -------
-                if (Clipped(v))
+                if (Clipped(_tmpVector4s))
                 {
                     continue;
-                }
+                }                
 
                 // ------- Perspective division --------
                 //clip space to NDC
@@ -336,28 +338,20 @@ namespace URasterizer
                 }
 
                 Triangle t = new Triangle();
-                for(int k=0; k<3; k++)
-                {
-                    t.SetPosition(k, v[k]);                       
-                }
+                t.Vertex0.Position = v[0];
+                t.Vertex1.Position = v[1];
+                t.Vertex2.Position = v[2];                
 
                 //set obj normal
-                t.SetNormal(0, osNormals[idx0]);
-                t.SetNormal(1, osNormals[idx1]);
-                t.SetNormal(2, osNormals[idx2]);
+                t.Vertex0.Normal = vsOutput[idx0].objectNormal;
+                t.Vertex1.Normal = vsOutput[idx1].objectNormal;
+                t.Vertex2.Normal = vsOutput[idx2].objectNormal;                
 
-                if (mesh.uv.Length > 0)
-                {
-                    Vector2[] uv =
-                    {
-                        mesh.uv[idx0],
-                        mesh.uv[idx1],
-                        mesh.uv[idx2]
-                    };
-                    for (int k = 0; k < 3; k++)
-                    {                        
-                        t.SetTexCoord(k, uv[k]);
-                    }
+                if (ro.uvs.Length > 0)
+                {                    
+                    t.Vertex0.Texcoord = ro.uvs[idx0];
+                    t.Vertex1.Texcoord = ro.uvs[idx1];
+                    t.Vertex2.Texcoord = ro.uvs[idx2];                    
                 }
 
                 //设置顶点色,使用config中的颜色数组循环设置                
@@ -365,24 +359,24 @@ namespace URasterizer
                 {
                     int vertexColorCount = _config.VertexColors.Colors.Length;
 
-                    t.SetColor(0, _config.VertexColors.Colors[idx0 % vertexColorCount]);
-                    t.SetColor(1, _config.VertexColors.Colors[idx1 % vertexColorCount]);
-                    t.SetColor(2, _config.VertexColors.Colors[idx2 % vertexColorCount]);
+                    t.Vertex0.Color = _config.VertexColors.Colors[idx0 % vertexColorCount];
+                    t.Vertex1.Color = _config.VertexColors.Colors[idx1 % vertexColorCount];
+                    t.Vertex2.Color = _config.VertexColors.Colors[idx2 % vertexColorCount];
                 }
                 else
                 {
-                    t.SetColor(0, Color.white);
-                    t.SetColor(1, Color.white);
-                    t.SetColor(2, Color.white);
+                    t.Vertex0.Color = Color.white;
+                    t.Vertex1.Color = Color.white;
+                    t.Vertex2.Color = Color.white;
                 }
 
                 //set world space pos & normal
-                t.SetWorldPos(0, wsVertices[idx0]);
-                t.SetWorldPos(1, wsVertices[idx1]);
-                t.SetWorldPos(2, wsVertices[idx2]);
-                t.SetWorldNormal(0, wsNormals[idx0]);
-                t.SetWorldNormal(1, wsNormals[idx1]);
-                t.SetWorldNormal(2, wsNormals[idx2]);
+                t.Vertex0.WorldPos = vsOutput[idx0].worldPos;
+                t.Vertex1.WorldPos = vsOutput[idx1].worldPos;
+                t.Vertex2.WorldPos = vsOutput[idx2].worldPos;
+                t.Vertex0.WorldNormal = vsOutput[idx0].worldNormal;
+                t.Vertex1.WorldNormal = vsOutput[idx1].worldNormal;
+                t.Vertex2.WorldNormal = vsOutput[idx2].worldNormal;
 
                 /// ---------- Rasterization -----------
                 if (_config.WireframeMode)
@@ -576,9 +570,9 @@ namespace URasterizer
 
         private void RasterizeWireframe(Triangle t)
         {
-            DrawLine(t.Positions[0], t.Positions[1], t.Colors[0], t.Colors[1]);
-            DrawLine(t.Positions[1], t.Positions[2], t.Colors[1], t.Colors[2]);
-            DrawLine(t.Positions[2], t.Positions[0], t.Colors[2], t.Colors[0]);
+            DrawLine(t.Vertex0.Position, t.Vertex1.Position, t.Vertex0.Color, t.Vertex1.Color);
+            DrawLine(t.Vertex1.Position, t.Vertex2.Position, t.Vertex1.Color, t.Vertex2.Color);
+            DrawLine(t.Vertex2.Position, t.Vertex0.Position, t.Vertex2.Color, t.Vertex0.Color);
         }
 
         #endregion
@@ -588,7 +582,10 @@ namespace URasterizer
         //Screen space  rasterization
         void RasterizeTriangle(Triangle t, RenderingObject ro)
         {
-            var v = t.Positions;
+            var v = _tmpVector4s;
+            v[0] = t.Vertex0.Position;
+            v[1] = t.Vertex1.Position;
+            v[2] = t.Vertex2.Position;            
             
             //Find out the bounding box of current triangle.
             float minX = v[0].x;
@@ -652,11 +649,11 @@ namespace URasterizer
                                 depth_buf[index] = zp;
 
                                 //透视校正插值
-                                Color color_p = (alpha * t.Colors[0] / v[0].w + beta * t.Colors[1] / v[1].w + gamma * t.Colors[2] / v[2].w) * z;
-                                Vector2 uv_p = (alpha * t.TexCoords[0] / v[0].w + beta * t.TexCoords[1] / v[1].w + gamma * t.TexCoords[2] / v[2].w) * z;
-                                Vector3 normal_p = (alpha * t.Normals[0] / v[0].w + beta * t.Normals[1] / v[1].w + gamma * t.Normals[2] / v[2].w) * z;
-                                Vector3 worldPos_p = (alpha * t.WorldPoses[0] / v[0].w + beta * t.WorldPoses[1] / v[1].w + gamma * t.WorldPoses[2] / v[2].w) * z;
-                                Vector3 worldNormal_p = (alpha * t.WorldNormals[0] / v[0].w + beta * t.WorldNormals[1] / v[1].w + gamma * t.WorldNormals[2] / v[2].w) * z;
+                                Color color_p = (alpha * t.Vertex0.Color / v[0].w + beta * t.Vertex1.Color / v[1].w + gamma * t.Vertex2.Color / v[2].w) * z;
+                                Vector2 uv_p = (alpha * t.Vertex0.Texcoord / v[0].w + beta * t.Vertex1.Texcoord / v[1].w + gamma * t.Vertex2.Texcoord / v[2].w) * z;
+                                Vector3 normal_p = (alpha * t.Vertex0.Normal / v[0].w + beta * t.Vertex1.Normal  / v[1].w + gamma * t.Vertex2.Normal  / v[2].w) * z;
+                                Vector3 worldPos_p = (alpha * t.Vertex0.WorldPos / v[0].w + beta * t.Vertex1.WorldPos / v[1].w + gamma * t.Vertex2.WorldPos / v[2].w) * z;
+                                Vector3 worldNormal_p = (alpha * t.Vertex0.WorldNormal / v[0].w + beta * t.Vertex1.WorldNormal / v[1].w + gamma * t.Vertex2.WorldNormal / v[2].w) * z;
 
                                 if (CurrentFragmentShader != null)
                                 {
@@ -717,7 +714,7 @@ namespace URasterizer
                                         samplers_mask_MSAA[index] = true;
 
                                         //透视校正插值
-                                        Color color_p = (alpha * t.Colors[0] / v[0].w + beta * t.Colors[1] / v[1].w + gamma * t.Colors[2] / v[2].w) * z;
+                                        Color color_p = (alpha * t.Vertex0.Color / v[0].w + beta * t.Vertex1.Color / v[1].w + gamma * t.Vertex2.Color / v[2].w) * z;
                                         samplers_color_MSAA[index] = color_p;
                                     }
                                 }
@@ -731,11 +728,10 @@ namespace URasterizer
 
         bool IsInsideTriangle(int x, int y, Triangle t, float offsetX=0.5f, float offsetY=0.5f)
         {
-            Vector3[] v = new Vector3[3];
-            for(int i=0; i<3; ++i)
-            {
-                v[i] = new Vector3(t.Positions[i].x, t.Positions[i].y, t.Positions[i].z);
-            }
+            var v = _tmpVector3s;            
+            v[0] = new Vector3(t.Vertex0.Position.x, t.Vertex0.Position.y, t.Vertex0.Position.z);
+            v[1] = new Vector3(t.Vertex1.Position.x, t.Vertex1.Position.y, t.Vertex1.Position.z);
+            v[2] = new Vector3(t.Vertex2.Position.x, t.Vertex2.Position.y, t.Vertex2.Position.z);            
 
             //当前像素中心位置p
             Vector3 p = new Vector3(x + offsetX, y + offsetY, 0);            
@@ -764,7 +760,11 @@ namespace URasterizer
 
         Vector3 ComputeBarycentric2D(float x, float y, Triangle t)
         {
-            var v = t.Positions;
+            var v = _tmpVector4s;            
+            v[0] = t.Vertex0.Position;
+            v[1] = t.Vertex1.Position;
+            v[2] = t.Vertex2.Position;
+            
             float c1 = (x * (v[1].y - v[2].y) + (v[2].x - v[1].x) * y + v[1].x * v[2].y - v[2].x * v[1].y) / (v[0].x * (v[1].y - v[2].y) + (v[2].x - v[1].x) * v[0].y + v[1].x * v[2].y - v[2].x * v[1].y);
             float c2 = (x * (v[2].y - v[0].y) + (v[0].x - v[2].x) * y + v[2].x * v[0].y - v[0].x * v[2].y) / (v[1].x * (v[2].y - v[0].y) + (v[0].x - v[2].x) * v[1].y + v[2].x * v[0].y - v[0].x * v[2].y);
             float c3 = (x * (v[0].y - v[1].y) + (v[1].x - v[0].x) * y + v[0].x * v[1].y - v[1].x * v[0].y) / (v[2].x * (v[0].y - v[1].y) + (v[1].x - v[0].x) * v[2].y + v[0].x * v[1].y - v[1].x * v[0].y);

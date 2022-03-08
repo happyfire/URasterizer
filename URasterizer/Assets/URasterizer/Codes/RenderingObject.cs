@@ -9,12 +9,22 @@ namespace URasterizer
         public bool DoubleSideRendering;
         public Texture2D texture;
 
+        //缓存避免在draw loop中从mesh copy
+        [HideInInspector, System.NonSerialized]
+        public Vector3[] meshVertices;
+        [HideInInspector, System.NonSerialized]
+        public Vector3[] meshNormals;
+        [HideInInspector, System.NonSerialized]
+        public int[] triangles;
+        [HideInInspector, System.NonSerialized]
+        public Vector2[] uvs;
+
         private void Start()
         {
             var meshFilter = GetComponent<MeshFilter>();
             if(meshFilter != null)
             {
-                mesh = meshFilter.mesh;
+                mesh = meshFilter.mesh;                
             }
             var meshRenderer = GetComponent<MeshRenderer>();             
             if (meshRenderer != null && meshRenderer.sharedMaterial!=null)
