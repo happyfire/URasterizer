@@ -46,6 +46,7 @@
      <Compile Include="Assets\URasterizer\Codes\Triangle.cs" />
      <Compile Include="Assets\URasterizer\Codes\Rasterizer.cs" />
      <Compile Include="Assets\URasterizer\Codes\TransformTool.cs" />
+     <Compile Include="Assets\URasterizer\Codes\ProfileManager.cs" />
      <None Include="Assets\URasterizer\DefaultShader.shader" />
      <None Include="Assets\URasterizer\URComputeShader.compute" />
     <Reference Include="UnityEngine">

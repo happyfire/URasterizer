@@ -18,13 +18,17 @@ namespace URasterizer
         public int[] triangles;
         [HideInInspector, System.NonSerialized]
         public Vector2[] uvs;
+        [HideInInspector, System.NonSerialized]
+        public VSOutBuf[] vsOutputBuffer;
+
 
         private void Start()
         {
             var meshFilter = GetComponent<MeshFilter>();
             if(meshFilter != null)
             {
-                mesh = meshFilter.mesh;                
+                mesh = meshFilter.mesh;    
+                vsOutputBuffer = new VSOutBuf[mesh.vertexCount];            
             }
             var meshRenderer = GetComponent<MeshRenderer>();             
             if (meshRenderer != null && meshRenderer.sharedMaterial!=null)

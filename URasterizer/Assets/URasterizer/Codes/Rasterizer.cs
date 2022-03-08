@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace URasterizer
 {
-    struct VSOutBuf
+    public struct VSOutBuf
     {
         public Vector4 clipPos; //clip space vertices
         public Vector3 worldPos; //world space vertices
@@ -138,6 +138,8 @@ namespace URasterizer
 
         public void Clear(BufferMask mask)
         {
+            ProfileManager.BeginSample("Rasterizer.Clear");
+
             if (_config.MSAA != MSAALevel.Disabled && !_config.WireframeMode)
             {
                 AllocateMSAABuffers();
@@ -164,6 +166,7 @@ namespace URasterizer
             _trianglesAll = _trianglesRendered = 0;
             _verticesAll = 0;
 
+            ProfileManager.EndSample();
             
         }
 
@@ -195,6 +198,8 @@ namespace URasterizer
 
         public void Draw(RenderingObject ro, Camera camera)
         {
+            ProfileManager.BeginSample("Rasterizer.Draw");
+
             Mesh mesh = ro.mesh;
             if(ro.meshVertices==null){               
                 ro.meshVertices = mesh.vertices;
@@ -220,9 +225,11 @@ namespace URasterizer
 
 
             /// ------------- Vertex Shader -------------------
-            VSOutBuf[] vsOutput = new VSOutBuf[mesh.vertexCount];                     
+            VSOutBuf[] vsOutput = ro.vsOutputBuffer;                   
 
             if(_config.UseComputeShader && _config.VertexShader != null){
+                ProfileManager.BeginSample("Rasterizer.VertexShader GPU");
+
                 ComputeBuffer vertexBuffer = new ComputeBuffer(mesh.vertexCount, 3*4);
                 vertexBuffer.SetData(ro.meshVertices);
                 ComputeBuffer normalBuffer = new ComputeBuffer(mesh.vertexCount, 3*4);
@@ -246,10 +253,12 @@ namespace URasterizer
 
                 vertexBuffer.Dispose();
                 normalBuffer.Dispose();
-                outBuffer.Dispose();                                           
+                outBuffer.Dispose();      
+
+                ProfileManager.EndSample();                                     
             }
             else{
-                
+                ProfileManager.BeginSample("Rasterizer.VertexShader CPU");
                 for(int i=0; i<mesh.vertexCount; ++i)
                 {                
                     var vert = ro.meshVertices[i];        
@@ -261,10 +270,11 @@ namespace URasterizer
                     vsOutput[i].objectNormal = objNormal;
                     vsOutput[i].worldNormal = _matModel * objNormal;
                 }
+                ProfileManager.EndSample();
             }
 
             
-
+            ProfileManager.BeginSample("Rasterizer.PrimitiveAssembly");
 
             var indices = ro.triangles;
             for(int i=0; i< indices.Length; i+=3)
@@ -380,15 +390,17 @@ namespace URasterizer
 
                 /// ---------- Rasterization -----------
                 if (_config.WireframeMode)
-                {
-                    RasterizeWireframe(t);
+                {                    
+                    RasterizeWireframe(t);                    
                 }
                 else
-                {
-                    RasterizeTriangle(t, ro);
+                {                    
+                    RasterizeTriangle(t, ro);                    
                 }
                 
             }
+
+            ProfileManager.EndSample();
 
             //Resolve AA
             if(_config.MSAA != MSAALevel.Disabled && !_config.WireframeMode)
@@ -424,6 +436,8 @@ namespace URasterizer
                     }
                 }
             }
+
+            ProfileManager.EndSample();
         }        
 
         //三角形Clipping操作，对于部分在clipping volume中的图元，
@@ -570,9 +584,11 @@ namespace URasterizer
 
         private void RasterizeWireframe(Triangle t)
         {
+            ProfileManager.BeginSample("Rasterizer.RasterizeWireframe");
             DrawLine(t.Vertex0.Position, t.Vertex1.Position, t.Vertex0.Color, t.Vertex1.Color);
             DrawLine(t.Vertex1.Position, t.Vertex2.Position, t.Vertex1.Color, t.Vertex2.Color);
             DrawLine(t.Vertex2.Position, t.Vertex0.Position, t.Vertex2.Color, t.Vertex0.Color);
+            ProfileManager.EndSample();
         }
 
         #endregion
@@ -582,6 +598,7 @@ namespace URasterizer
         //Screen space  rasterization
         void RasterizeTriangle(Triangle t, RenderingObject ro)
         {
+            ProfileManager.BeginSample("Rasterizer.RasterizeTriangle");
             var v = _tmpVector4s;
             v[0] = t.Vertex0.Position;
             v[1] = t.Vertex1.Position;
@@ -647,13 +664,15 @@ namespace URasterizer
                             if(zp >= depth_buf[index])
                             {
                                 depth_buf[index] = zp;
-
+                                
                                 //透视校正插值
+                                ProfileManager.BeginSample("Rasterizer.RasterizeTriangle.AttributeInterpolation");
                                 Color color_p = (alpha * t.Vertex0.Color / v[0].w + beta * t.Vertex1.Color / v[1].w + gamma * t.Vertex2.Color / v[2].w) * z;
                                 Vector2 uv_p = (alpha * t.Vertex0.Texcoord / v[0].w + beta * t.Vertex1.Texcoord / v[1].w + gamma * t.Vertex2.Texcoord / v[2].w) * z;
                                 Vector3 normal_p = (alpha * t.Vertex0.Normal / v[0].w + beta * t.Vertex1.Normal  / v[1].w + gamma * t.Vertex2.Normal  / v[2].w) * z;
                                 Vector3 worldPos_p = (alpha * t.Vertex0.WorldPos / v[0].w + beta * t.Vertex1.WorldPos / v[1].w + gamma * t.Vertex2.WorldPos / v[2].w) * z;
                                 Vector3 worldNormal_p = (alpha * t.Vertex0.WorldNormal / v[0].w + beta * t.Vertex1.WorldNormal / v[1].w + gamma * t.Vertex2.WorldNormal / v[2].w) * z;
+                                ProfileManager.EndSample();
 
                                 if (CurrentFragmentShader != null)
                                 {
@@ -665,7 +684,9 @@ namespace URasterizer
                                     input.WorldPos = worldPos_p;
                                     input.WorldNormal = worldNormal_p;
 
+                                    ProfileManager.BeginSample("Rasterizer.RasterizeTriangle.FragmentShader");
                                     frame_buf[index] = CurrentFragmentShader(input);
+                                    ProfileManager.EndSample();
                                 }
                                 
 
@@ -724,10 +745,13 @@ namespace URasterizer
                     }
                 }
             }
+
+            ProfileManager.EndSample();
         }
 
         bool IsInsideTriangle(int x, int y, Triangle t, float offsetX=0.5f, float offsetY=0.5f)
         {
+            ProfileManager.BeginSample("Rasterizer.IsInsideTriangle");
             var v = _tmpVector3s;            
             v[0] = new Vector3(t.Vertex0.Position.x, t.Vertex0.Position.y, t.Vertex0.Position.z);
             v[1] = new Vector3(t.Vertex1.Position.x, t.Vertex1.Position.y, t.Vertex1.Position.z);
@@ -751,15 +775,18 @@ namespace URasterizer
                 Vector3 cross2p = Vector3.Cross(v2p, v20);
                 if(cross2p.z * cross1p.z > 0)
                 {
+                    ProfileManager.EndSample();
                     return true;
                 }
             }
 
+            ProfileManager.EndSample();
             return false;
         }
 
         Vector3 ComputeBarycentric2D(float x, float y, Triangle t)
         {
+            ProfileManager.BeginSample("Rasterizer.ComputeBarycentric2D");
             var v = _tmpVector4s;            
             v[0] = t.Vertex0.Position;
             v[1] = t.Vertex1.Position;
@@ -768,6 +795,8 @@ namespace URasterizer
             float c1 = (x * (v[1].y - v[2].y) + (v[2].x - v[1].x) * y + v[1].x * v[2].y - v[2].x * v[1].y) / (v[0].x * (v[1].y - v[2].y) + (v[2].x - v[1].x) * v[0].y + v[1].x * v[2].y - v[2].x * v[1].y);
             float c2 = (x * (v[2].y - v[0].y) + (v[0].x - v[2].x) * y + v[2].x * v[0].y - v[0].x * v[2].y) / (v[1].x * (v[2].y - v[0].y) + (v[0].x - v[2].x) * v[1].y + v[2].x * v[0].y - v[0].x * v[2].y);
             float c3 = (x * (v[0].y - v[1].y) + (v[1].x - v[0].x) * y + v[0].x * v[1].y - v[1].x * v[0].y) / (v[2].x * (v[0].y - v[1].y) + (v[1].x - v[0].x) * v[2].y + v[0].x * v[1].y - v[1].x * v[0].y);
+
+            ProfileManager.EndSample();
             return new Vector3(c1, c2, c3);
         }
 
@@ -789,6 +818,8 @@ namespace URasterizer
 
         public void UpdateFrame()
         {
+            ProfileManager.BeginSample("CameraRenderer.UpdateFrame");
+
             switch (_config.DisplayBuffer)
             {
                 case DisplayBufferType.Color:
@@ -819,6 +850,8 @@ namespace URasterizer
             {
                 StatDelegate(_verticesAll, _trianglesAll, _trianglesRendered);
             }
+
+            ProfileManager.EndSample();
         }
 
 

@@ -26,8 +26,8 @@ namespace URasterizer
         }
 
         private void OnPostRender()
-        {
-            Render();
+        {            
+            Render();            
         }        
 
         void Init()
@@ -62,6 +62,8 @@ namespace URasterizer
 
         void Render()
         {
+            ProfileManager.BeginSample("CameraRenderer.Render");
+
             var r = _rasterizer;
             r.Clear(BufferMask.Color | BufferMask.Depth);
 
@@ -92,16 +94,18 @@ namespace URasterizer
             ShaderContext.Uniforms.WorldSpaceLightDir = -lightDir;
             ShaderContext.Uniforms.LightColor = _mainLight.color * _mainLight.intensity;
             ShaderContext.Uniforms.AmbientColor = _config.AmbientColor;
-
+            
             for (int i=0; i<renderingObjects.Count; ++i)
             {
                 if (renderingObjects[i].gameObject.activeInHierarchy)
-                {
+                {                    
                     r.Draw(renderingObjects[i], _camera);
                 }
-            }                                 
+            }    
+                                                    
+            r.UpdateFrame();            
 
-            r.UpdateFrame();
+            ProfileManager.EndSample();
         }
     }
 }
