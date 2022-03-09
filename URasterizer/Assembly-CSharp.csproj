@@ -37,6 +37,7 @@
   </PropertyGroup>
   <ItemGroup>
      <Compile Include="Assets\URasterizer\Codes\HandmakeMesh.cs" />
+     <Compile Include="Assets\URasterizer\Codes\ProfileManager.cs" />
      <Compile Include="Assets\URasterizer\Codes\FragmentShader.cs" />
      <Compile Include="Assets\URasterizer\Codes\RenderingObject.cs" />
      <Compile Include="Assets\URasterizer\Codes\VertexColors.cs" />
@@ -46,7 +47,7 @@
      <Compile Include="Assets\URasterizer\Codes\Triangle.cs" />
      <Compile Include="Assets\URasterizer\Codes\Rasterizer.cs" />
      <Compile Include="Assets\URasterizer\Codes\TransformTool.cs" />
-     <Compile Include="Assets\URasterizer\Codes\ProfileManager.cs" />
+     <Compile Include="Assets\URasterizer\Codes\FPSDisplay.cs" />
      <None Include="Assets\URasterizer\DefaultShader.shader" />
      <None Include="Assets\URasterizer\URComputeShader.compute" />
     <Reference Include="UnityEngine">

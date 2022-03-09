@@ -251,9 +251,9 @@ namespace URasterizer
                 
                 outBuffer.GetData(vsOutput);      
 
-                vertexBuffer.Dispose();
-                normalBuffer.Dispose();
-                outBuffer.Dispose();      
+                vertexBuffer.Release();
+                normalBuffer.Release();
+                outBuffer.Release();      
 
                 ProfileManager.EndSample();                                     
             }
@@ -647,13 +647,16 @@ namespace URasterizer
                 {
                     for(int x = minPX; x < maxPX; ++x)
                     {
-                        if(IsInsideTriangle(x, y, t))
+                        //if(IsInsideTriangle(x, y, t)) //-->检测是否在三角形内比使用重心坐标检测要慢，因此先计算重心坐标，再检查3个坐标是否有小于0
                         {
                             //计算重心坐标
                             var c = ComputeBarycentric2D(x, y, t);
                             float alpha = c.x;
                             float beta = c.y;
                             float gamma = c.z;
+                            if(alpha < 0 || beta < 0 || gamma < 0){                                
+                                continue;
+                            }
                             //透视校正插值，z为透视校正插值后的view space z值
                             float z = 1.0f / (alpha / v[0].w + beta / v[1].w + gamma / v[2].w);
                             //zp为透视校正插值后的screen space z值
@@ -795,7 +798,7 @@ namespace URasterizer
             float c1 = (x * (v[1].y - v[2].y) + (v[2].x - v[1].x) * y + v[1].x * v[2].y - v[2].x * v[1].y) / (v[0].x * (v[1].y - v[2].y) + (v[2].x - v[1].x) * v[0].y + v[1].x * v[2].y - v[2].x * v[1].y);
             float c2 = (x * (v[2].y - v[0].y) + (v[0].x - v[2].x) * y + v[2].x * v[0].y - v[0].x * v[2].y) / (v[1].x * (v[2].y - v[0].y) + (v[0].x - v[2].x) * v[1].y + v[2].x * v[0].y - v[0].x * v[2].y);
             float c3 = (x * (v[0].y - v[1].y) + (v[1].x - v[0].x) * y + v[0].x * v[1].y - v[1].x * v[0].y) / (v[2].x * (v[0].y - v[1].y) + (v[1].x - v[0].x) * v[2].y + v[0].x * v[1].y - v[1].x * v[0].y);
-
+            
             ProfileManager.EndSample();
             return new Vector3(c1, c2, c3);
         }
