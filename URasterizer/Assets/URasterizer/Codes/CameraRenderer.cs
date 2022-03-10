@@ -7,7 +7,11 @@ namespace URasterizer
 {
     public class CameraRenderer : MonoBehaviour
     {        
-        Rasterizer _rasterizer;
+        IRasterizer _rasterizer;
+        IRasterizer _lastRasterizer;
+
+        CPURasterizer _cpuRasterizer;
+        GPURasterizer _gpuRasterizer;
 
         public RawImage rawImg;        
         
@@ -19,6 +23,8 @@ namespace URasterizer
         private Light _mainLight;
 
         public RenderingConfig _config;
+
+        StatsPanel _statsPanel;
 
         private void Start()
         {
@@ -50,12 +56,13 @@ namespace URasterizer
             int h = Mathf.FloorToInt(rect.rect.height);
             Debug.Log($"screen size: {w}x{h}");
 
-            _rasterizer = new Rasterizer(w, h, _config);
-            rawImg.texture = _rasterizer.texture;
+            _cpuRasterizer = new CPURasterizer(w, h, _config);
+            _gpuRasterizer = new GPURasterizer(w, h, _config);
 
-            var statPanel = this.GetComponent<StatsPanel>();
-            if (statPanel != null) {
-                _rasterizer.StatDelegate += statPanel.StatDelegate;
+            _statsPanel = this.GetComponent<StatsPanel>();
+            if (_statsPanel != null) {
+                _cpuRasterizer.StatDelegate += _statsPanel.StatDelegate;
+                _gpuRasterizer.StatDelegate += _statsPanel.StatDelegate;
             }
         }
 
@@ -63,6 +70,25 @@ namespace URasterizer
         void Render()
         {
             ProfileManager.BeginSample("CameraRenderer.Render");
+
+            if(_config.RasterizerType == RasterizerType.GPUDriven && _config.ComputeShader != null){
+                _rasterizer = _gpuRasterizer;                
+            }
+            else{
+                _rasterizer = _cpuRasterizer;                
+            }
+
+            if(_rasterizer != _lastRasterizer){
+                _lastRasterizer = _rasterizer;
+                if(_rasterizer == _cpuRasterizer){
+                    rawImg.texture = _cpuRasterizer.texture;
+                    _statsPanel.SetRasterizerType("CPU");
+                }
+                else if(_rasterizer == _gpuRasterizer){
+                    rawImg.texture = _gpuRasterizer.texture;
+                    _statsPanel.SetRasterizerType("GPU Driven");
+                }
+            }
 
             var r = _rasterizer;
             r.Clear(BufferMask.Color | BufferMask.Depth);

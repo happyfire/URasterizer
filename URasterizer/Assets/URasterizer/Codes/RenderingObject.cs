@@ -11,15 +11,19 @@ namespace URasterizer
 
         //缓存避免在draw loop中从mesh copy
         [HideInInspector, System.NonSerialized]
-        public Vector3[] meshVertices;
+        public Vector3[] MeshVertices;
         [HideInInspector, System.NonSerialized]
-        public Vector3[] meshNormals;
+        public Vector3[] MeshNormals;
         [HideInInspector, System.NonSerialized]
-        public int[] triangles;
+        public int[] MeshTriangles;
         [HideInInspector, System.NonSerialized]
-        public Vector2[] uvs;
+        public Vector2[] MeshUVs;
         [HideInInspector, System.NonSerialized]
         public VSOutBuf[] vsOutputBuffer;
+
+        public ComputeBuffer VertexBuffer;
+        public ComputeBuffer NormalBuffer;
+        public ComputeBuffer OutBuffer;
 
 
         private void Start()
@@ -27,7 +31,7 @@ namespace URasterizer
             var meshFilter = GetComponent<MeshFilter>();
             if(meshFilter != null)
             {
-                mesh = meshFilter.mesh;    
+                mesh = meshFilter.mesh;                  
                 vsOutputBuffer = new VSOutBuf[mesh.vertexCount];            
             }
             var meshRenderer = GetComponent<MeshRenderer>();             
@@ -35,7 +39,34 @@ namespace URasterizer
             {
                 texture = meshRenderer.sharedMaterial.mainTexture as Texture2D;
             }
-        }  
+
+            MeshVertices = mesh.vertices;
+            MeshNormals = mesh.normals;
+            MeshTriangles = mesh.triangles;
+            MeshUVs = mesh.uv;
+
+            //为了能在运行时动态切换是否使用 GPU Driven Rasterizer, 这里同时把GPU使用的Compute Buffer创建出来
+            int vertexCnt = mesh.vertexCount;
+            VertexBuffer = new ComputeBuffer(vertexCnt, 3*sizeof(float));
+            VertexBuffer.name = "VertexBuffer";
+            VertexBuffer.SetData(MeshVertices);
+            
+            NormalBuffer = new ComputeBuffer(vertexCnt, 3*sizeof(float));
+            NormalBuffer.name = "NormalBuffer";
+            NormalBuffer.SetData(MeshNormals);
+            
+            OutBuffer = new ComputeBuffer(vertexCnt, 13*sizeof(float));
+            OutBuffer.name = "OutBuffer";
+        }
+
+        void OnDestroy()
+        {
+            VertexBuffer.Release();
+            NormalBuffer.Release();
+            OutBuffer.Release();
+        }
+
+
 
         // TRS
         public Matrix4x4 GetModelMatrix()

@@ -1,5 +1,5 @@
 
-#pragma kernel CSMain
+#pragma kernel VertexProcess
 
 struct OutBuf
 {
@@ -18,8 +18,8 @@ StructuredBuffer<float3> vertexBuffer;
 StructuredBuffer<float3> normalBuffer;
 RWStructuredBuffer<OutBuf> outBuffer;
 
-[numthreads(256,1,1)]
-void CSMain (uint3 id : SV_DispatchThreadID)
+[numthreads(768,1,1)]
+void VertexProcess (uint3 id : SV_DispatchThreadID)
 {
     float4 pos = float4(vertexBuffer[id.x].x, vertexBuffer[id.x].y, -vertexBuffer[id.x].z, 1.0f);
     float3 normal = float3(normalBuffer[id.x].x, normalBuffer[id.x].y, -normalBuffer[id.x].z);

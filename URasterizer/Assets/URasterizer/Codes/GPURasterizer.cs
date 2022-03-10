@@ -3,24 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 
 namespace URasterizer
-{
-    public struct VSOutBuf
-    {
-        public Vector4 clipPos; //clip space vertices
-        public Vector3 worldPos; //world space vertices
-        public Vector3 objectNormal; //obj space normals
-        public Vector3 worldNormal; //world space normals
-    }
-
-    public enum BufferMask
-    {
-        Color = 1,
-        Depth = 2
-    }    
-
-    public delegate void OnRasterizerStatUpdate(int verticesAll, int trianglesAll, int trianglesRendered);
-
-    public class Rasterizer
+{    
+    public class GPURasterizer : IRasterizer
     {
         int _width;
         int _height;
@@ -59,7 +43,7 @@ namespace URasterizer
 
         public Texture2D texture;
 
-        public FragmentShader CurrentFragmentShader;
+        public FragmentShader CurrentFragmentShader {get; set;}
 
         //Stats
         int _trianglesAll, _trianglesRendered;
@@ -67,14 +51,23 @@ namespace URasterizer
 
         public OnRasterizerStatUpdate StatDelegate;
 
-        //ÓÅ»¯GC
+        //ä¼˜åŒ–GC
         Vector4[] _tmpVector4s = new Vector4[3];
         Vector3[] _tmpVector3s = new Vector3[3];
 
+        //Compute shader
+        ComputeShader computeShader;
+        int kernelVertexProcess;
+        int vertexBufferId;
+        int normalBufferId;
+        int outBufferId;
+        int matMVPId;
+        int matModelId;
 
-        public Rasterizer(int w, int h, RenderingConfig config)
+
+        public GPURasterizer(int w, int h, RenderingConfig config)
         {
-            Debug.Log($"Rasterizer screen size: {w}x{h}");
+            Debug.Log($"GPURasterizer screen size: {w}x{h}");
 
             _config = config;
 
@@ -92,6 +85,15 @@ namespace URasterizer
             {
                 AllocateMSAABuffers();
             }
+
+            //init for compute shader
+            computeShader = config.ComputeShader;
+            kernelVertexProcess = computeShader.FindKernel("VertexProcess");
+            vertexBufferId = Shader.PropertyToID("vertexBuffer");
+            normalBufferId = Shader.PropertyToID("normalBuffer");
+            outBufferId = Shader.PropertyToID("outBuffer");
+            matMVPId = Shader.PropertyToID("matMVP");
+            matModelId = Shader.PropertyToID("matModel");
         }
 
         void AllocateMSAABuffers()
@@ -172,7 +174,7 @@ namespace URasterizer
 
         public void SetupViewProjectionMatrix(Camera camera)
         {
-            //×óÊÖ×ø±êÏµ×ªÓÒÊÖ×ø±êÏµ,ÒÔÏÂ×ø±êºÍÏòÁ¿zÈ¡·´
+            //å·¦æ‰‹åæ ‡ç³»è½¬å³æ‰‹åæ ‡ç³»,ä»¥ä¸‹åæ ‡å’Œå‘é‡zå–å
             var camPos = camera.transform.position;
             camPos.z *= -1; 
             var lookAt = camera.transform.forward;
@@ -201,12 +203,6 @@ namespace URasterizer
             ProfileManager.BeginSample("Rasterizer.Draw");
 
             Mesh mesh = ro.mesh;
-            if(ro.meshVertices==null){               
-                ro.meshVertices = mesh.vertices;
-                ro.meshNormals = mesh.normals;
-                ro.triangles = mesh.triangles;
-                ro.uvs = mesh.uv;
-            }
 
             SetupViewProjectionMatrix(camera);
 
@@ -216,75 +212,46 @@ namespace URasterizer
             Matrix4x4 normalMat = _matModel.inverse.transpose;
 
             _verticesAll += mesh.vertexCount;
-            _trianglesAll += ro.triangles.Length / 3;
+            _trianglesAll += ro.MeshTriangles.Length / 3;
             
 
-            //UnityÄ£ĞÍ±¾µØ×ø±êÏµÒ²ÊÇ×óÊÖÏµ£¬ĞèÒª×ª³ÉÎÒÃÇÊ¹ÓÃµÄÓÒÊÖÏµ
-            //1. zÖá·´×ª
-            //2. Èı½ÇĞÎ¶¥µã»·ÈÆ·½Ïò´ÓË³Ê±Õë¸Ä³ÉÄæÊ±Õë
+            //Unityæ¨¡å‹æœ¬åœ°åæ ‡ç³»ä¹Ÿæ˜¯å·¦æ‰‹ç³»ï¼Œéœ€è¦è½¬æˆæˆ‘ä»¬ä½¿ç”¨çš„å³æ‰‹ç³»
+            //1. zè½´åè½¬
+            //2. ä¸‰è§’å½¢é¡¶ç‚¹ç¯ç»•æ–¹å‘ä»é¡ºæ—¶é’ˆæ”¹æˆé€†æ—¶é’ˆ
 
 
             /// ------------- Vertex Shader -------------------
             VSOutBuf[] vsOutput = ro.vsOutputBuffer;                   
 
-            if(_config.UseComputeShader && _config.VertexShader != null){
-                ProfileManager.BeginSample("Rasterizer.VertexShader GPU");
+            
+            ProfileManager.BeginSample("Rasterizer.VertexShader GPU");                
 
-                ComputeBuffer vertexBuffer = new ComputeBuffer(mesh.vertexCount, 3*4);
-                vertexBuffer.name = "vertex";
-                vertexBuffer.SetData(ro.meshVertices);
-                ComputeBuffer normalBuffer = new ComputeBuffer(mesh.vertexCount, 3*4);
-                normalBuffer.name = "normal";
-                normalBuffer.SetData(ro.meshNormals);
-                ComputeBuffer outBuffer = new ComputeBuffer(mesh.vertexCount, 13*4);
-                outBuffer.name = "out";
+            var shader = _config.ComputeShader;            
+            shader.SetMatrix(matMVPId, mvp);
+            shader.SetMatrix(matModelId, _matModel);
+            shader.SetBuffer(kernelVertexProcess, vertexBufferId, ro.VertexBuffer);
+            shader.SetBuffer(kernelVertexProcess, normalBufferId, ro.NormalBuffer);
+            shader.SetBuffer(kernelVertexProcess, outBufferId, ro.OutBuffer);
+            
+            int groupCnt = Mathf.CeilToInt(mesh.vertexCount/768f);
+            groupCnt = groupCnt==0? 1: groupCnt;
+            shader.Dispatch(kernelVertexProcess, groupCnt, 1, 1);  
+            
+            ro.OutBuffer.GetData(vsOutput);      
 
-                var shader = _config.VertexShader;
-                int kernel = shader.FindKernel("CSMain");
-                shader.SetMatrix("matMVP", mvp);
-                shader.SetMatrix("matModel", _matModel);
-                shader.SetBuffer(kernel, "vertexBuffer", vertexBuffer);
-                shader.SetBuffer(kernel,"normalBuffer", normalBuffer);
-                shader.SetBuffer(kernel, "outBuffer", outBuffer);
-                
-                int groupCnt = Mathf.CeilToInt(mesh.vertexCount/256f);
-                groupCnt = groupCnt==0? 1: groupCnt;
-                shader.Dispatch(kernel, groupCnt, 1, 1);  
-                
-                outBuffer.GetData(vsOutput);      
-
-                vertexBuffer.Release();
-                normalBuffer.Release();
-                outBuffer.Release();      
-
-                ProfileManager.EndSample();                                     
-            }
-            else{
-                ProfileManager.BeginSample("Rasterizer.VertexShader CPU");
-                for(int i=0; i<mesh.vertexCount; ++i)
-                {                
-                    var vert = ro.meshVertices[i];        
-                    var objVert = new Vector4(vert.x, vert.y, -vert.z, 1); //×¢ÒâÕâ¶ù·´×ªÁËz×ø±ê
-                    vsOutput[i].clipPos = mvp * objVert;
-                    vsOutput[i].worldPos = _matModel * objVert;
-                    var normal = ro.meshNormals[i];
-                    var objNormal = new Vector3(normal.x, normal.y, -normal.z);
-                    vsOutput[i].objectNormal = objNormal;
-                    vsOutput[i].worldNormal = _matModel * objNormal;
-                }
-                ProfileManager.EndSample();
-            }
-
+            ProfileManager.EndSample();                                     
+            
+           
             
             ProfileManager.BeginSample("Rasterizer.PrimitiveAssembly");
 
-            var indices = ro.triangles;
+            var indices = ro.MeshTriangles;
             for(int i=0; i< indices.Length; i+=3)
             {         
                 /// -------------- Primitive Assembly -----------------
 
-                //×¢ÒâÕâ¶ù¶Ôµ÷ÁËv0ºÍv1µÄË÷Òı£¬ÒòÎªÔ­À´µÄ 0,1,2ÊÇË³Ê±ÕëµÄ£¬¶Ôµ÷ºóÊÇ 1,0,2ÊÇÄæÊ±ÕëµÄ
-                //Unity QuardÄ£ĞÍµÄÁ½¸öÈı½ÇĞÎË÷Òı·Ö±ğÊÇ 0,3,1,3,0,2 ×ª»»ºóÎª 3,0,1,0,3,2
+                //æ³¨æ„è¿™å„¿å¯¹è°ƒäº†v0å’Œv1çš„ç´¢å¼•ï¼Œå› ä¸ºåŸæ¥çš„ 0,1,2æ˜¯é¡ºæ—¶é’ˆçš„ï¼Œå¯¹è°ƒåæ˜¯ 1,0,2æ˜¯é€†æ—¶é’ˆçš„
+                //Unity Quardæ¨¡å‹çš„ä¸¤ä¸ªä¸‰è§’å½¢ç´¢å¼•åˆ†åˆ«æ˜¯ 0,3,1,3,0,2 è½¬æ¢åä¸º 3,0,1,0,3,2
                 int idx0 = indices[i+1];
                 int idx1 = indices[i]; 
                 int idx2 = indices[i+2];  
@@ -335,15 +302,15 @@ namespace URasterizer
                     vec.x = 0.5f * _width * (vec.x + 1.0f);
                     vec.y = 0.5f * _height * (vec.y + 1.0f);
 
-                    //ÔÚÓ²¼şäÖÈ¾ÖĞ£¬NDCµÄzÖµ¾­¹ıÓ²¼şµÄÍ¸ÊÓ³ı·¨Ö®ºó¾ÍÖ±½ÓĞ´Èëµ½depth bufferÁË£¬Èç¹ûÒªµ÷ÕûĞèÒªÔÚÍ¶Ó°¾ØÕóÖĞµ÷Õû
-                    //ÓÉÓÚÎÒÃÇÊÇÈí¼şäÖÈ¾£¬ËùÒÔ¿ÉÒÔÔÚÕâÀïµ÷ÕûzÖµ¡£                    
+                    //åœ¨ç¡¬ä»¶æ¸²æŸ“ä¸­ï¼ŒNDCçš„zå€¼ç»è¿‡ç¡¬ä»¶çš„é€è§†é™¤æ³•ä¹‹åå°±ç›´æ¥å†™å…¥åˆ°depth bufferäº†ï¼Œå¦‚æœè¦è°ƒæ•´éœ€è¦åœ¨æŠ•å½±çŸ©é˜µä¸­è°ƒæ•´
+                    //ç”±äºæˆ‘ä»¬æ˜¯è½¯ä»¶æ¸²æŸ“ï¼Œæ‰€ä»¥å¯ä»¥åœ¨è¿™é‡Œè°ƒæ•´zå€¼ã€‚                    
 
-                    //GAMES101Ô¼¶¨µÄNDCÊÇÓÒÊÖ×ø±êÏµ£¬zÖµ·¶Î§ÊÇ[-1,1]£¬µ«nÎª1£¬fÎª-1£¬Òò´ËÖµÔ½´óÔ½¿¿½ün¡£                    
-                    //ÎªÁË¿ÉÊÓ»¯Depth buffer£¬½«×îÖÕµÄzÖµ´Ó[-1,1]Ó³Éäµ½[0,1]µÄ·¶Î§£¬Òò´Ë×îÖÕnÎª1, fÎª0¡£ÀënÔ½½ü£¬Éî¶ÈÖµÔ½´ó¡£                    
-                    //ÓÉÓÚÔ¶´¦µÄzÖµÎª0£¬Òò´ËclearÊ±Éî¶ÈÒªÇå³ıÎª0£¬È»ºóÉî¶È²âÊÔÊ±£¬Ê¹ÓÃGREATER²âÊÔ¡£
-                    //(µ±È»ÎÒÃÇÒ²¿ÉÒÔÔÚÕâ¶ù·´×ªzÖµ£¬È»ºóclearÊ±Ê¹ÓÃfloat.MaxValueÇå³ı£¬²¢ÇÒÉî¶È²âÊÔÊ±Ê¹ÓÃLESS_EQUAL²âÊÔ)
-                    //×¢Òâ£ºÕâ¶ùµÄzÖµµ÷Õû²¢²»ÊÇ±ØÒªµÄ£¬Ö»ÊÇÎªÁË¿ÉÊÓ»¯Ê±±ãÓÚÓ³ÉäÎªÑÕÉ«Öµ¡£ÆäÊµÒ²¿ÉÒÔÔÚ¿ÉÊÓ»¯µÄµØ·½µ÷Õû¡£
-                    //µ«ÊÇÕâÃ´µ÷Õûºó£¬ÕıºÃºÍUnityÔÚDirectXÆ½Ì¨µÄReverse zÒ»Ñù£¬ÈÃnear plane¸½½üµÄzÖµµÄ¸¡µãÊı¾«¶ÈÌá¸ß¡£
+                    //GAMES101çº¦å®šçš„NDCæ˜¯å³æ‰‹åæ ‡ç³»ï¼Œzå€¼èŒƒå›´æ˜¯[-1,1]ï¼Œä½†nä¸º1ï¼Œfä¸º-1ï¼Œå› æ­¤å€¼è¶Šå¤§è¶Šé è¿‘nã€‚                    
+                    //ä¸ºäº†å¯è§†åŒ–Depth bufferï¼Œå°†æœ€ç»ˆçš„zå€¼ä»[-1,1]æ˜ å°„åˆ°[0,1]çš„èŒƒå›´ï¼Œå› æ­¤æœ€ç»ˆnä¸º1, fä¸º0ã€‚ç¦»nè¶Šè¿‘ï¼Œæ·±åº¦å€¼è¶Šå¤§ã€‚                    
+                    //ç”±äºè¿œå¤„çš„zå€¼ä¸º0ï¼Œå› æ­¤clearæ—¶æ·±åº¦è¦æ¸…é™¤ä¸º0ï¼Œç„¶åæ·±åº¦æµ‹è¯•æ—¶ï¼Œä½¿ç”¨GREATERæµ‹è¯•ã€‚
+                    //(å½“ç„¶æˆ‘ä»¬ä¹Ÿå¯ä»¥åœ¨è¿™å„¿åè½¬zå€¼ï¼Œç„¶åclearæ—¶ä½¿ç”¨float.MaxValueæ¸…é™¤ï¼Œå¹¶ä¸”æ·±åº¦æµ‹è¯•æ—¶ä½¿ç”¨LESS_EQUALæµ‹è¯•)
+                    //æ³¨æ„ï¼šè¿™å„¿çš„zå€¼è°ƒæ•´å¹¶ä¸æ˜¯å¿…è¦çš„ï¼Œåªæ˜¯ä¸ºäº†å¯è§†åŒ–æ—¶ä¾¿äºæ˜ å°„ä¸ºé¢œè‰²å€¼ã€‚å…¶å®ä¹Ÿå¯ä»¥åœ¨å¯è§†åŒ–çš„åœ°æ–¹è°ƒæ•´ã€‚
+                    //ä½†æ˜¯è¿™ä¹ˆè°ƒæ•´åï¼Œæ­£å¥½å’ŒUnityåœ¨DirectXå¹³å°çš„Reverse zä¸€æ ·ï¼Œè®©near planeé™„è¿‘çš„zå€¼çš„æµ®ç‚¹æ•°ç²¾åº¦æé«˜ã€‚
                     vec.z = vec.z * 0.5f + 0.5f; 
 
                     v[k] = vec;
@@ -359,14 +326,14 @@ namespace URasterizer
                 t.Vertex1.Normal = vsOutput[idx1].objectNormal;
                 t.Vertex2.Normal = vsOutput[idx2].objectNormal;                
 
-                if (ro.uvs.Length > 0)
+                if (ro.MeshUVs.Length > 0)
                 {                    
-                    t.Vertex0.Texcoord = ro.uvs[idx0];
-                    t.Vertex1.Texcoord = ro.uvs[idx1];
-                    t.Vertex2.Texcoord = ro.uvs[idx2];                    
+                    t.Vertex0.Texcoord = ro.MeshUVs[idx0];
+                    t.Vertex1.Texcoord = ro.MeshUVs[idx1];
+                    t.Vertex2.Texcoord = ro.MeshUVs[idx2];                    
                 }
 
-                //ÉèÖÃ¶¥µãÉ«,Ê¹ÓÃconfigÖĞµÄÑÕÉ«Êı×éÑ­»·ÉèÖÃ                
+                //è®¾ç½®é¡¶ç‚¹è‰²,ä½¿ç”¨configä¸­çš„é¢œè‰²æ•°ç»„å¾ªç¯è®¾ç½®                
                 if(_config.VertexColors != null && _config.VertexColors.Colors.Length > 0)
                 {
                     int vertexColorCount = _config.VertexColors.Colors.Length;
@@ -442,39 +409,39 @@ namespace URasterizer
             ProfileManager.EndSample();
         }        
 
-        //Èı½ÇĞÎClipping²Ù×÷£¬¶ÔÓÚ²¿·ÖÔÚclipping volumeÖĞµÄÍ¼Ôª£¬
-        //Ó²¼şÊµÏÖÊ±Ò»°ãÖ»¶Ô²¿·Ö¶¥µãzÖµÔÚnear,farÖ®¼äµÄÍ¼Ôª½øĞĞclipping²Ù×÷£¬
-        //¶ø²¿·Ö¶¥µãx,yÖµÔÚx,y²Ã¼ôÆ½ÃæÖ®¼äµÄÍ¼ÔªÔò²»½øĞĞ²Ã¼ô£¬Ö»ÊÇÍ¨¹ıÒ»¸ö±Èviewport¸ü´óÒ»Ğ©µÄguard-bandÇøÓò½øĞĞÕûÌåÌŞ³ı£¨Ïàµ±ÓÚ·Å´óx,yµÄ²âÊÔ·¶Î§£©
-        //ÕâÑùx,y²Ã¼ôÆ½ÃæÖ®¼äµÄÍ¼Ôª×îÖÕÔÚframe bufferÉÏ½øĞĞScissor²âÊÔ¡£
-        //´Ë´¦µÄÊµÏÖ¼ò»¯ÎªÖ»ÕûÌåÌŞ³ı£¬²»×öÈÎºÎclipping²Ù×÷¡£¶ÔÓÚx,y²Ã¼ôÃ»ÎÊÌâ£¬ËäÈ»Ã»À©´óregion,Ò²¿ÉÒÔ×îºóÔÚframe bufferÉÏ²Ã¼ôµô¡£
-        //¶ÔÓÚzµÄ²Ã¼ôÓÉÓÚÃ»ÓĞ´¦Àí£¬»á¿´µ½Õû¸öÈı½ÇĞÎÏûÊ§µ¼ÖÂµÄ±ßÔµ²»ÆëÕû
+        //ä¸‰è§’å½¢Clippingæ“ä½œï¼Œå¯¹äºéƒ¨åˆ†åœ¨clipping volumeä¸­çš„å›¾å…ƒï¼Œ
+        //ç¡¬ä»¶å®ç°æ—¶ä¸€èˆ¬åªå¯¹éƒ¨åˆ†é¡¶ç‚¹zå€¼åœ¨near,farä¹‹é—´çš„å›¾å…ƒè¿›è¡Œclippingæ“ä½œï¼Œ
+        //è€Œéƒ¨åˆ†é¡¶ç‚¹x,yå€¼åœ¨x,yè£å‰ªå¹³é¢ä¹‹é—´çš„å›¾å…ƒåˆ™ä¸è¿›è¡Œè£å‰ªï¼Œåªæ˜¯é€šè¿‡ä¸€ä¸ªæ¯”viewportæ›´å¤§ä¸€äº›çš„guard-bandåŒºåŸŸè¿›è¡Œæ•´ä½“å‰”é™¤ï¼ˆç›¸å½“äºæ”¾å¤§x,yçš„æµ‹è¯•èŒƒå›´ï¼‰
+        //è¿™æ ·x,yè£å‰ªå¹³é¢ä¹‹é—´çš„å›¾å…ƒæœ€ç»ˆåœ¨frame bufferä¸Šè¿›è¡ŒScissoræµ‹è¯•ã€‚
+        //æ­¤å¤„çš„å®ç°ç®€åŒ–ä¸ºåªæ•´ä½“å‰”é™¤ï¼Œä¸åšä»»ä½•clippingæ“ä½œã€‚å¯¹äºx,yè£å‰ªæ²¡é—®é¢˜ï¼Œè™½ç„¶æ²¡æ‰©å¤§region,ä¹Ÿå¯ä»¥æœ€ååœ¨frame bufferä¸Šè£å‰ªæ‰ã€‚
+        //å¯¹äºzçš„è£å‰ªç”±äºæ²¡æœ‰å¤„ç†ï¼Œä¼šçœ‹åˆ°æ•´ä¸ªä¸‰è§’å½¢æ¶ˆå¤±å¯¼è‡´çš„è¾¹ç¼˜ä¸é½æ•´
         bool Clipped(Vector4[] v)
         {
-            //Clip spaceÊ¹ÓÃGAMES101¹æ·¶£¬ÓÒÊÖ×ø±êÏµ£¬nÎª+1£¬ fÎª-1
-            //²Ã¼ô£¨½öÕûÌåÌŞ³ı£©     
-            //Êµ¼ÊµÄÓ²¼şÊÇÔÚClip space²Ã¼ô£¬ËùÒÔ´Ë´¦ÎÒÃÇÒ²Ê¹ÓÃclip space £¨µ±È»ÓÉÓÚÎÒÃÇ²»ÕæÕıµÄ²Ã¼ô£¬Ö»ÊÇÕûÌåÌŞ³ı£¬ËùÒÔÆäÊµÔÚNDC²Ù×÷¸ü·½±ã£©
+            //Clip spaceä½¿ç”¨GAMES101è§„èŒƒï¼Œå³æ‰‹åæ ‡ç³»ï¼Œnä¸º+1ï¼Œ fä¸º-1
+            //è£å‰ªï¼ˆä»…æ•´ä½“å‰”é™¤ï¼‰     
+            //å®é™…çš„ç¡¬ä»¶æ˜¯åœ¨Clip spaceè£å‰ªï¼Œæ‰€ä»¥æ­¤å¤„æˆ‘ä»¬ä¹Ÿä½¿ç”¨clip space ï¼ˆå½“ç„¶ç”±äºæˆ‘ä»¬ä¸çœŸæ­£çš„è£å‰ªï¼Œåªæ˜¯æ•´ä½“å‰”é™¤ï¼Œæ‰€ä»¥å…¶å®åœ¨NDCæ“ä½œæ›´æ–¹ä¾¿ï¼‰
             for (int i = 0; i < 3; ++i)
             {
                 var vertex = v[i];
                 var w = vertex.w;
-                w = w >= 0 ? w : -w; //ÓÉÓÚNDCÖĞ×ÜÊÇÂú×ã-1<=Zndc<=1, ¶øµ± w < 0 Ê±£¬-w >= Zclip = Zndc*w >= w¡£ËùÒÔ´ËÊ±clip spaceµÄ×ø±ê·¶Î§ÊÇ[w,-w], ÎªÁË±È½ÏÊ±¸üÃ÷È·£¬½«wÈ¡Õı
+                w = w >= 0 ? w : -w; //ç”±äºNDCä¸­æ€»æ˜¯æ»¡è¶³-1<=Zndc<=1, è€Œå½“ w < 0 æ—¶ï¼Œ-w >= Zclip = Zndc*w >= wã€‚æ‰€ä»¥æ­¤æ—¶clip spaceçš„åæ ‡èŒƒå›´æ˜¯[w,-w], ä¸ºäº†æ¯”è¾ƒæ—¶æ›´æ˜ç¡®ï¼Œå°†wå–æ­£
                 
                 bool inside = (vertex.x <= w && vertex.x >= -w
                     && vertex.y <= w && vertex.y >= -w
                     && vertex.z <= w && vertex.z >= -w);
                 if (inside)
                 {             
-                    //²»²Ã¼ôÈı½ÇĞÎ£¬Ö»ÒªÓĞÈÎÒâÒ»µãÔÚclip spaceÖĞÔòÈı½ÇĞÎÕûÌå±£Áô
+                    //ä¸è£å‰ªä¸‰è§’å½¢ï¼Œåªè¦æœ‰ä»»æ„ä¸€ç‚¹åœ¨clip spaceä¸­åˆ™ä¸‰è§’å½¢æ•´ä½“ä¿ç•™
                     return false;
                 }
             }
 
-            //Èı¸ö¶¥µã¶¼²»ÔÚÈı½ÇĞÎÖĞÔòÌŞ³ı
+            //ä¸‰ä¸ªé¡¶ç‚¹éƒ½ä¸åœ¨ä¸‰è§’å½¢ä¸­åˆ™å‰”é™¤
             return true;
         }
 
         #region Wireframe mode
-        //BreshhamËã·¨»­Ïß,ÑÕÉ«Ê¹ÓÃÏßĞÔ²åÖµ£¨·ÇÍ¸ÊÓĞ£Õı£©
+        //Breshhamç®—æ³•ç”»çº¿,é¢œè‰²ä½¿ç”¨çº¿æ€§æ’å€¼ï¼ˆéé€è§†æ ¡æ­£ï¼‰
         private void DrawLine(Vector3 begin, Vector3 end, Color colorBegin, Color colorEnd)
         {            
             int x1 = Mathf.FloorToInt(begin.x);
@@ -643,15 +610,15 @@ namespace URasterizer
 
             if(_config.MSAA == MSAALevel.Disabled)
             {                
-                // ±éÀúµ±Ç°Èı½ÇĞÎ°üÎ§ÖĞµÄËùÓĞÏñËØ£¬ÅĞ¶Ïµ±Ç°ÏñËØÊÇ·ñÔÚÈı½ÇĞÎÖĞ
-                // ¶ÔÓÚÔÚÈı½ÇĞÎÖĞµÄÏñËØ£¬Ê¹ÓÃÖØĞÄ×ø±ê²åÖµµÃµ½Éî¶ÈÖµ£¬²¢Ê¹ÓÃz buffer½øĞĞÉî¶È²âÊÔºÍĞ´Èë
+                // éå†å½“å‰ä¸‰è§’å½¢åŒ…å›´ä¸­çš„æ‰€æœ‰åƒç´ ï¼Œåˆ¤æ–­å½“å‰åƒç´ æ˜¯å¦åœ¨ä¸‰è§’å½¢ä¸­
+                // å¯¹äºåœ¨ä¸‰è§’å½¢ä¸­çš„åƒç´ ï¼Œä½¿ç”¨é‡å¿ƒåæ ‡æ’å€¼å¾—åˆ°æ·±åº¦å€¼ï¼Œå¹¶ä½¿ç”¨z bufferè¿›è¡Œæ·±åº¦æµ‹è¯•å’Œå†™å…¥
                 for(int y = minPY; y < maxPY; ++y)
                 {
                     for(int x = minPX; x < maxPX; ++x)
                     {
-                        //if(IsInsideTriangle(x, y, t)) //-->¼ì²âÊÇ·ñÔÚÈı½ÇĞÎÄÚ±ÈÊ¹ÓÃÖØĞÄ×ø±ê¼ì²âÒªÂı£¬Òò´ËÏÈ¼ÆËãÖØĞÄ×ø±ê£¬ÔÙ¼ì²é3¸ö×ø±êÊÇ·ñÓĞĞ¡ÓÚ0
+                        //if(IsInsideTriangle(x, y, t)) //-->æ£€æµ‹æ˜¯å¦åœ¨ä¸‰è§’å½¢å†…æ¯”ä½¿ç”¨é‡å¿ƒåæ ‡æ£€æµ‹è¦æ…¢ï¼Œå› æ­¤å…ˆè®¡ç®—é‡å¿ƒåæ ‡ï¼Œå†æ£€æŸ¥3ä¸ªåæ ‡æ˜¯å¦æœ‰å°äº0
                         {
-                            //¼ÆËãÖØĞÄ×ø±ê
+                            //è®¡ç®—é‡å¿ƒåæ ‡
                             var c = ComputeBarycentric2D(x, y, t);
                             float alpha = c.x;
                             float beta = c.y;
@@ -659,18 +626,18 @@ namespace URasterizer
                             if(alpha < 0 || beta < 0 || gamma < 0){                                
                                 continue;
                             }
-                            //Í¸ÊÓĞ£Õı²åÖµ£¬zÎªÍ¸ÊÓĞ£Õı²åÖµºóµÄview space zÖµ
+                            //é€è§†æ ¡æ­£æ’å€¼ï¼Œzä¸ºé€è§†æ ¡æ­£æ’å€¼åçš„view space zå€¼
                             float z = 1.0f / (alpha / v[0].w + beta / v[1].w + gamma / v[2].w);
-                            //zpÎªÍ¸ÊÓĞ£Õı²åÖµºóµÄscreen space zÖµ
+                            //zpä¸ºé€è§†æ ¡æ­£æ’å€¼åçš„screen space zå€¼
                             float zp = (alpha * v[0].z / v[0].w + beta * v[1].z / v[1].w + gamma * v[2].z / v[2].w) * z;
                             
-                            //Éî¶È²âÊÔ(×¢ÒâÎÒÃÇÕâ¶ùµÄzÖµÔ½´óÔ½¿¿½ünear plane£¬Òò´Ë´óÖµÍ¨¹ı²âÊÔ£©
+                            //æ·±åº¦æµ‹è¯•(æ³¨æ„æˆ‘ä»¬è¿™å„¿çš„zå€¼è¶Šå¤§è¶Šé è¿‘near planeï¼Œå› æ­¤å¤§å€¼é€šè¿‡æµ‹è¯•ï¼‰
                             int index = GetIndex(x, y);
                             if(zp >= depth_buf[index])
                             {
                                 depth_buf[index] = zp;
                                 
-                                //Í¸ÊÓĞ£Õı²åÖµ
+                                //é€è§†æ ¡æ­£æ’å€¼
                                 ProfileManager.BeginSample("Rasterizer.RasterizeTriangle.AttributeInterpolation");
                                 Color color_p = (alpha * t.Vertex0.Color / v[0].w + beta * t.Vertex1.Color / v[1].w + gamma * t.Vertex2.Color / v[2].w) * z;
                                 Vector2 uv_p = (alpha * t.Vertex0.Texcoord / v[0].w + beta * t.Vertex1.Texcoord / v[1].w + gamma * t.Vertex2.Texcoord / v[2].w) * z;
@@ -711,7 +678,7 @@ namespace URasterizer
                 {
                     for (int x = minPX; x < maxPX; ++x)
                     {
-                        //¼ì²éÃ¿¸ö×ÓÏñËØÊÇ·ñÔÚÈı½ÇĞÎÄÚ£¬Èç¹ûÔÚ½øĞĞÖØĞÄ×ø±ê²åÖµºÍÉî¶È²âÊÔ
+                        //æ£€æŸ¥æ¯ä¸ªå­åƒç´ æ˜¯å¦åœ¨ä¸‰è§’å½¢å†…ï¼Œå¦‚æœåœ¨è¿›è¡Œé‡å¿ƒåæ ‡æ’å€¼å’Œæ·±åº¦æµ‹è¯•
                         for(int si=0; si<MSAALevel; ++si)
                         {
                             for(int sj=0; sj<MSAALevel; ++sj)
@@ -720,17 +687,17 @@ namespace URasterizer
                                 float offsety = sampler_dis_half + sj * sampler_dis;
                                 if (IsInsideTriangle(x, y, t, offsetx, offsety))
                                 {
-                                    //¼ÆËãÖØĞÄ×ø±ê
+                                    //è®¡ç®—é‡å¿ƒåæ ‡
                                     var c = ComputeBarycentric2D(x+offsetx, y+offsety, t);
                                     float alpha = c.x;
                                     float beta = c.y;
                                     float gamma = c.z;
-                                    //Í¸ÊÓĞ£Õı²åÖµ£¬zÎªÍ¸ÊÓĞ£Õı²åÖµºóµÄview space zÖµ
+                                    //é€è§†æ ¡æ­£æ’å€¼ï¼Œzä¸ºé€è§†æ ¡æ­£æ’å€¼åçš„view space zå€¼
                                     float z = 1.0f / (alpha / v[0].w + beta / v[1].w + gamma / v[2].w);
-                                    //zpÎªÍ¸ÊÓĞ£Õı²åÖµºóµÄscreen space zÖµ
+                                    //zpä¸ºé€è§†æ ¡æ­£æ’å€¼åçš„screen space zå€¼
                                     float zp = (alpha * v[0].z / v[0].w + beta * v[1].z / v[1].w + gamma * v[2].z / v[2].w) * z;
 
-                                    //Éî¶È²âÊÔ(×¢ÒâÎÒÃÇÕâ¶ùµÄzÖµÔ½´óÔ½¿¿½ünear plane£¬Òò´Ë´óÖµÍ¨¹ı²âÊÔ£©                                    
+                                    //æ·±åº¦æµ‹è¯•(æ³¨æ„æˆ‘ä»¬è¿™å„¿çš„zå€¼è¶Šå¤§è¶Šé è¿‘near planeï¼Œå› æ­¤å¤§å€¼é€šè¿‡æµ‹è¯•ï¼‰                                    
                                     int xi = x * MSAALevel + si;
                                     int yi = y * MSAALevel + sj;
                                     int index = yi * _width * MSAALevel + xi;
@@ -739,7 +706,7 @@ namespace URasterizer
                                         samplers_depth_MSAA[index] = zp;
                                         samplers_mask_MSAA[index] = true;
 
-                                        //Í¸ÊÓĞ£Õı²åÖµ
+                                        //é€è§†æ ¡æ­£æ’å€¼
                                         Color color_p = (alpha * t.Vertex0.Color / v[0].w + beta * t.Vertex1.Color / v[1].w + gamma * t.Vertex2.Color / v[2].w) * z;
                                         samplers_color_MSAA[index] = color_p;
                                     }
@@ -762,7 +729,7 @@ namespace URasterizer
             v[1] = new Vector3(t.Vertex1.Position.x, t.Vertex1.Position.y, t.Vertex1.Position.z);
             v[2] = new Vector3(t.Vertex2.Position.x, t.Vertex2.Position.y, t.Vertex2.Position.z);            
 
-            //µ±Ç°ÏñËØÖĞĞÄÎ»ÖÃp
+            //å½“å‰åƒç´ ä¸­å¿ƒä½ç½®p
             Vector3 p = new Vector3(x + offsetX, y + offsetY, 0);            
             
             Vector3 v0p = p - v[0]; v0p[2] = 0;
@@ -834,7 +801,7 @@ namespace URasterizer
                 case DisplayBufferType.DepthGray:
                     for (int i = 0; i < depth_buf.Length; ++i)
                     {
-                        //depth_bufÖĞµÄÖµ·¶Î§ÊÇ[0,1]£¬ÇÒ×î½ü´¦Îª1£¬×îÔ¶´¦Îª0¡£Òò´Ë¿ÉÊÓ»¯ºó±³¾°ÊÇºÚÉ«
+                        //depth_bufä¸­çš„å€¼èŒƒå›´æ˜¯[0,1]ï¼Œä¸”æœ€è¿‘å¤„ä¸º1ï¼Œæœ€è¿œå¤„ä¸º0ã€‚å› æ­¤å¯è§†åŒ–åèƒŒæ™¯æ˜¯é»‘è‰²
                         float c = depth_buf[i]; 
                         if(_config.DisplayBuffer == DisplayBufferType.DepthRed)
                         {
