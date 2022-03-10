@@ -231,11 +231,13 @@ namespace URasterizer
                 ProfileManager.BeginSample("Rasterizer.VertexShader GPU");
 
                 ComputeBuffer vertexBuffer = new ComputeBuffer(mesh.vertexCount, 3*4);
+                vertexBuffer.name = "vertex";
                 vertexBuffer.SetData(ro.meshVertices);
                 ComputeBuffer normalBuffer = new ComputeBuffer(mesh.vertexCount, 3*4);
+                normalBuffer.name = "normal";
                 normalBuffer.SetData(ro.meshNormals);
                 ComputeBuffer outBuffer = new ComputeBuffer(mesh.vertexCount, 13*4);
-                
+                outBuffer.name = "out";
 
                 var shader = _config.VertexShader;
                 int kernel = shader.FindKernel("CSMain");
@@ -245,7 +247,7 @@ namespace URasterizer
                 shader.SetBuffer(kernel,"normalBuffer", normalBuffer);
                 shader.SetBuffer(kernel, "outBuffer", outBuffer);
                 
-                int groupCnt = mesh.vertexCount/256;
+                int groupCnt = Mathf.CeilToInt(mesh.vertexCount/256f);
                 groupCnt = groupCnt==0? 1: groupCnt;
                 shader.Dispatch(kernel, groupCnt, 1, 1);  
                 

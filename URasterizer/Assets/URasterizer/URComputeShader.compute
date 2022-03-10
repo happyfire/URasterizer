@@ -22,8 +22,9 @@ RWStructuredBuffer<OutBuf> outBuffer;
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
     float4 pos = float4(vertexBuffer[id.x].x, vertexBuffer[id.x].y, -vertexBuffer[id.x].z, 1.0f);
+    float3 normal = float3(normalBuffer[id.x].x, normalBuffer[id.x].y, -normalBuffer[id.x].z);
     outBuffer[id.x].clipPos = mul(matMVP, pos);      
-    outBuffer[id.x].worldPos = mul(matModel, pos.xyz);      
-    outBuffer[id.x].objectNormal = float3(normalBuffer[id.x].x, normalBuffer[id.x].y, -normalBuffer[id.x].z);    
-    outBuffer[id.x].worldNormal = mul(matModel, outBuffer[id.x].objectNormal);      
+    outBuffer[id.x].worldPos = mul(matModel, pos).xyz;      
+    outBuffer[id.x].objectNormal = normal;    
+    outBuffer[id.x].worldNormal = mul( (float3x3)matModel , normal);      
 }
