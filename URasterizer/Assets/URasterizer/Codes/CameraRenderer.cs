@@ -80,14 +80,9 @@ namespace URasterizer
 
             if(_rasterizer != _lastRasterizer){
                 _lastRasterizer = _rasterizer;
-                if(_rasterizer == _cpuRasterizer){
-                    rawImg.texture = _cpuRasterizer.texture;
-                    _statsPanel.SetRasterizerType("CPU");
-                }
-                else if(_rasterizer == _gpuRasterizer){
-                    rawImg.texture = _gpuRasterizer.texture;
-                    _statsPanel.SetRasterizerType("GPU Driven");
-                }
+                
+                rawImg.texture = _rasterizer.ColorTexture;
+                _statsPanel.SetRasterizerType(_rasterizer.Name);   
             }
 
             var r = _rasterizer;

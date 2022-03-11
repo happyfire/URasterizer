@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5fa123a60a768444af03a384cb34a74, type: 3}
   m_Name: RenderingConfig
   m_EditorClassIdentifier: 
-  ClearColor: {r: 0, g: 0, b: 0, a: 1}
+  ClearColor: {r: 0.056692798, g: 0.41403675, b: 0.9245283, a: 0.24705882}
   WireframeMode: 0
   BackfaceCulling: 1
   DisplayBuffer: 0

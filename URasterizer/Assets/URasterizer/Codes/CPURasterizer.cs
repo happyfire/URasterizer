@@ -55,6 +55,10 @@ namespace URasterizer
         Vector4[] _tmpVector4s = new Vector4[3];
         Vector3[] _tmpVector3s = new Vector3[3];
 
+        public String Name { get=>"CPU"; }
+
+        public Texture ColorTexture { get=>texture; }
+
 
         public CPURasterizer(int w, int h, RenderingConfig config)
         {

@@ -1,7 +1,10 @@
 
 #pragma kernel VertexProcess
+#pragma kernel ClearFrame
+#pragma kernel TriangleSetup
+#pragma kernel RasterizeTriangle
 
-struct OutBuf
+struct VertexOutBuf
 {
     float4 clipPos;
     float3 worldPos;
@@ -9,22 +12,343 @@ struct OutBuf
     float3 worldNormal;
 };
 
+float4 ClearColor;
+uint2 FrameBufferSize;
 
 float4x4 matMVP;
 float4x4 matModel;
 
+uint currentRenderTriangle;
+
 
 StructuredBuffer<float3> vertexBuffer;
 StructuredBuffer<float3> normalBuffer;
-RWStructuredBuffer<OutBuf> outBuffer;
+RWStructuredBuffer<VertexOutBuf> vertexOutBuffer;
+
+StructuredBuffer<uint3> triangleBuffer; // All triangles of the mesh
+AppendStructuredBuffer<uint3> renderTriangleBuffer; //triangles to render
+
+ConsumeStructuredBuffer<uint3> renderCosumeBuffer;
+
+RWTexture2D<float4> frameColorTexture;
+
+
+[numthreads(32,24,1)]
+void ClearFrame(uint3 id : SV_DispatchThreadID)
+{
+    frameColorTexture[id.xy] = ClearColor;
+}
 
 [numthreads(768,1,1)]
 void VertexProcess (uint3 id : SV_DispatchThreadID)
 {
     float4 pos = float4(vertexBuffer[id.x].x, vertexBuffer[id.x].y, -vertexBuffer[id.x].z, 1.0f);
     float3 normal = float3(normalBuffer[id.x].x, normalBuffer[id.x].y, -normalBuffer[id.x].z);
-    outBuffer[id.x].clipPos = mul(matMVP, pos);      
-    outBuffer[id.x].worldPos = mul(matModel, pos).xyz;      
-    outBuffer[id.x].objectNormal = normal;    
-    outBuffer[id.x].worldNormal = mul( (float3x3)matModel , normal);      
+    vertexOutBuffer[id.x].clipPos = mul(matMVP, pos);      
+    vertexOutBuffer[id.x].worldPos = mul(matModel, pos).xyz;      
+    vertexOutBuffer[id.x].objectNormal = normal;    
+    vertexOutBuffer[id.x].worldNormal = mul( (float3x3)matModel , normal);      
 }
+
+bool Clipped(float4 v[3])
+{
+    //Clip space使用GAMES101规范，右手坐标系，n为+1， f为-1
+    //裁剪（仅整体剔除）                 
+    for (int i = 0; i < 3; ++i)
+    {
+        float4 vertex = v[i];
+        float w = vertex.w;
+        w = w >= 0 ? w : -w; //由于NDC中总是满足-1<=Zndc<=1, 而当 w < 0 时，-w >= Zclip = Zndc*w >= w。所以此时clip space的坐标范围是[w,-w], 为了比较时更明确，将w取正
+        
+        bool inside = (vertex.x <= w && vertex.x >= -w
+            && vertex.y <= w && vertex.y >= -w
+            && vertex.z <= w && vertex.z >= -w);
+        if (inside)
+        {             
+            //不裁剪三角形，只要有任意一点在clip space中则三角形整体保留
+            return false;
+        }
+    }
+
+    //三个顶点都不在三角形中则剔除
+    return true;
+}
+
+[numthreads(768,1,1)]
+void TriangleSetup(uint3 id : SV_DispatchThreadID)
+{
+    uint3 tri = triangleBuffer[id.x];    
+    int idx0 = tri.x;
+    int idx1 = tri.y; 
+    int idx2 = tri.z; 
+
+    float4 v[3];
+    v[0] = vertexOutBuffer[idx0].clipPos;
+    v[1] = vertexOutBuffer[idx1].clipPos;
+    v[2] = vertexOutBuffer[idx2].clipPos;
+
+    if(Clipped(v)){
+       return; 
+    }
+    
+    //Perspective division, clip space to NDC
+    for (int k=0; k<3; k++)
+    {
+        v[k].x /= v[k].w;
+        v[k].y /= v[k].w;
+        v[k].z /= v[k].w;                  
+    }
+
+    //backface culling        
+    float3 e01 = v[1].xyz - v[0].xyz;
+    float3 e02 = v[2].xyz - v[0].xyz;
+    float3 crossv = cross(e01, e02);
+    if (crossv.z < 0)
+    {
+        return;
+    }
+
+    //Viewport Transform， NDC to screen space
+    for (k = 0; k < 3; k++)
+    {
+        float4 vec = v[k];
+        vec.x = 0.5f * FrameBufferSize.x * (vec.x + 1.0f);
+        vec.y = 0.5f * FrameBufferSize.y * (vec.y + 1.0f);
+
+        //在硬件渲染中，NDC的z值经过硬件的透视除法之后就直接写入到depth buffer了，如果要调整需要在投影矩阵中调整
+        //由于我们是软件渲染，所以可以在这里调整z值。                    
+
+        //GAMES101约定的NDC是右手坐标系，z值范围是[-1,1]，但n为1，f为-1，因此值越大越靠近n。                    
+        //为了可视化Depth buffer，将最终的z值从[-1,1]映射到[0,1]的范围，因此最终n为1, f为0。离n越近，深度值越大。                    
+        //由于远处的z值为0，因此clear时深度要清除为0，然后深度测试时，使用GREATER测试。
+        //(当然我们也可以在这儿反转z值，然后clear时使用float.MaxValue清除，并且深度测试时使用LESS_EQUAL测试)
+        //注意：这儿的z值调整并不是必要的，只是为了可视化时便于映射为颜色值。其实也可以在可视化的地方调整。
+        //但是这么调整后，正好和Unity在DirectX平台的Reverse z一样，让near plane附近的z值的浮点数精度提高。
+        vec.z = vec.z * 0.5f + 0.5f; 
+
+        v[k] = vec;
+    }
+
+    //Screen space coordinates saved in clip pos
+    vertexOutBuffer[idx0].clipPos = v[0];
+    vertexOutBuffer[idx1].clipPos = v[1];
+    vertexOutBuffer[idx2].clipPos = v[2];
+
+    //triangle actually rendering append to this buffer
+    renderTriangleBuffer.Append(uint3(idx0, idx1, idx2));    
+}
+
+float3 ComputeBarycentric2D(float x, float y, float4 v[3])
+{                        
+    float c1 = (x * (v[1].y - v[2].y) + (v[2].x - v[1].x) * y + v[1].x * v[2].y - v[2].x * v[1].y) / (v[0].x * (v[1].y - v[2].y) + (v[2].x - v[1].x) * v[0].y + v[1].x * v[2].y - v[2].x * v[1].y);
+    float c2 = (x * (v[2].y - v[0].y) + (v[0].x - v[2].x) * y + v[2].x * v[0].y - v[0].x * v[2].y) / (v[1].x * (v[2].y - v[0].y) + (v[0].x - v[2].x) * v[1].y + v[2].x * v[0].y - v[0].x * v[2].y);
+    float c3 = (x * (v[0].y - v[1].y) + (v[1].x - v[0].x) * y + v[0].x * v[1].y - v[1].x * v[0].y) / (v[2].x * (v[0].y - v[1].y) + (v[1].x - v[0].x) * v[2].y + v[0].x * v[1].y - v[1].x * v[0].y);                        
+    return float3(c1, c2, c3);
+}
+
+[numthreads(32,24,1)]
+void RasterizeTriangle(uint3 id : SV_DispatchThreadID)
+{
+    uint3 tri = renderCosumeBuffer.Consume();// triangleBuffer[currentRenderTriangle]; //triangleBuffer
+    int idx0 = tri.x;
+    int idx1 = tri.y; 
+    int idx2 = tri.z;
+    float4 v[3];
+    v[0] = vertexOutBuffer[idx0].clipPos;
+    v[1] = vertexOutBuffer[idx1].clipPos;
+    v[2] = vertexOutBuffer[idx2].clipPos;
+
+    //这个函数，每个像素都会执行，最好用一个buffer存所有的需要渲染的三角形的AABB，避免每次都在这儿计算
+    //Find out the bounding box of current triangle.
+    float minX = v[0].x;
+    float maxX = minX;
+    float minY = v[0].y;
+    float maxY = minY;
+
+    for(int i=1; i<3; ++i)
+    {
+        float x = v[i].x;
+        if(x < minX)
+        {
+            minX = x;
+        } else if(x > maxX)
+        {
+            maxX = x;
+        }
+        float y = v[i].y;
+        if(y < minY)
+        {
+            minY = y;
+        }else if(y > maxY)
+        {
+            maxY = y;
+        }
+    }
+
+    int minPX = floor(minX);
+    minPX = minPX < 0 ? 0 : minPX;
+    int maxPX = ceil(maxX);
+    maxPX = maxPX > FrameBufferSize.x ? FrameBufferSize.x : maxPX;
+    int minPY = floor(minY);
+    minPY = minPY < 0 ? 0 : minPY;
+    int maxPY = ceil(maxY);
+    maxPY = maxPY > FrameBufferSize.y ? FrameBufferSize.y : maxPY;
+
+    //判断当前像素是否在AABB中
+    if(id.x < minPX || id.x > maxPX || id.y < minPY || id.y > maxPY){
+        return;
+    }
+
+    int x = id.x;
+    int y = id.y;
+
+    //计算重心坐标
+    float3 c = ComputeBarycentric2D(x, y, v);
+    float alpha = c.x;
+    float beta = c.y;
+    float gamma = c.z;
+    if(alpha < 0 || beta < 0 || gamma < 0){                                
+        return;
+    }
+    //透视校正插值，z为透视校正插值后的view space z值
+    float z = 1.0f / (alpha / v[0].w + beta / v[1].w + gamma / v[2].w);
+    //zp为透视校正插值后的screen space z值
+    float zp = (alpha * v[0].z / v[0].w + beta * v[1].z / v[1].w + gamma * v[2].z / v[2].w) * z;
+    
+    //深度测试(注意我们这儿的z值越大越靠近near plane，因此大值通过测试）
+    
+    //if(zp >= depth_buf[index])
+    
+        //depth_buf[index] = zp;
+        
+        //透视校正插值
+        
+        //float3 color_p = (alpha * t.Vertex0.Color / v[0].w + beta * t.Vertex1.Color / v[1].w + gamma * t.Vertex2.Color / v[2].w) * z;
+        //Vector2 uv_p = (alpha * t.Vertex0.Texcoord / v[0].w + beta * t.Vertex1.Texcoord / v[1].w + gamma * t.Vertex2.Texcoord / v[2].w) * z;
+        //Vector3 normal_p = (alpha * t.Vertex0.Normal / v[0].w + beta * t.Vertex1.Normal  / v[1].w + gamma * t.Vertex2.Normal  / v[2].w) * z;
+        //Vector3 worldPos_p = (alpha * t.Vertex0.WorldPos / v[0].w + beta * t.Vertex1.WorldPos / v[1].w + gamma * t.Vertex2.WorldPos / v[2].w) * z;
+        //Vector3 worldNormal_p = (alpha * t.Vertex0.WorldNormal / v[0].w + beta * t.Vertex1.WorldNormal / v[1].w + gamma * t.Vertex2.WorldNormal / v[2].w) * z;
+
+        //if (CurrentFragmentShader != null)
+        {
+            //FragmentShaderInputData input = new FragmentShaderInputData();
+            //input.Color = color_p;
+            //input.UV = uv_p;
+            //input.Texture = ro.texture;
+            //input.LocalNormal = normal_p;
+            //input.WorldPos = worldPos_p;
+            //input.WorldNormal = worldNormal_p;
+
+            frameColorTexture[id.xy] = float4(1,1,1,1);
+        }
+
+}
+
+
+
+// void RasterizeTriangle(Triangle t, RenderingObject ro)
+//         {
+//             ProfileManager.BeginSample("Rasterizer.RasterizeTriangle");
+//             var v = _tmpVector4s;
+//             v[0] = t.Vertex0.Position;
+//             v[1] = t.Vertex1.Position;
+//             v[2] = t.Vertex2.Position;            
+            
+//             //Find out the bounding box of current triangle.
+//             float minX = v[0].x;
+//             float maxX = minX;
+//             float minY = v[0].y;
+//             float maxY = minY;
+
+//             for(int i=1; i<3; ++i)
+//             {
+//                 float x = v[i].x;
+//                 if(x < minX)
+//                 {
+//                     minX = x;
+//                 } else if(x > maxX)
+//                 {
+//                     maxX = x;
+//                 }
+//                 float y = v[i].y;
+//                 if(y < minY)
+//                 {
+//                     minY = y;
+//                 }else if(y > maxY)
+//                 {
+//                     maxY = y;
+//                 }
+//             }
+
+//             int minPX = Mathf.FloorToInt(minX);
+//             minPX = minPX < 0 ? 0 : minPX;
+//             int maxPX = Mathf.CeilToInt(maxX);
+//             maxPX = maxPX > _width ? _width : maxPX;
+//             int minPY = Mathf.FloorToInt(minY);
+//             minPY = minPY < 0 ? 0 : minPY;
+//             int maxPY = Mathf.CeilToInt(maxY);
+//             maxPY = maxPY > _height ? _height : maxPY;
+
+//             if(_config.MSAA == MSAALevel.Disabled)
+//             {                
+//                 // 遍历当前三角形包围中的所有像素，判断当前像素是否在三角形中
+//                 // 对于在三角形中的像素，使用重心坐标插值得到深度值，并使用z buffer进行深度测试和写入
+//                 for(int y = minPY; y < maxPY; ++y)
+//                 {
+//                     for(int x = minPX; x < maxPX; ++x)
+//                     {
+//                         //if(IsInsideTriangle(x, y, t)) //-->检测是否在三角形内比使用重心坐标检测要慢，因此先计算重心坐标，再检查3个坐标是否有小于0
+//                         {
+//                             //计算重心坐标
+//                             var c = ComputeBarycentric2D(x, y, t);
+//                             float alpha = c.x;
+//                             float beta = c.y;
+//                             float gamma = c.z;
+//                             if(alpha < 0 || beta < 0 || gamma < 0){                                
+//                                 continue;
+//                             }
+//                             //透视校正插值，z为透视校正插值后的view space z值
+//                             float z = 1.0f / (alpha / v[0].w + beta / v[1].w + gamma / v[2].w);
+//                             //zp为透视校正插值后的screen space z值
+//                             float zp = (alpha * v[0].z / v[0].w + beta * v[1].z / v[1].w + gamma * v[2].z / v[2].w) * z;
+                            
+//                             //深度测试(注意我们这儿的z值越大越靠近near plane，因此大值通过测试）
+//                             int index = GetIndex(x, y);
+//                             if(zp >= depth_buf[index])
+//                             {
+//                                 depth_buf[index] = zp;
+                                
+//                                 //透视校正插值
+//                                 ProfileManager.BeginSample("Rasterizer.RasterizeTriangle.AttributeInterpolation");
+//                                 Color color_p = (alpha * t.Vertex0.Color / v[0].w + beta * t.Vertex1.Color / v[1].w + gamma * t.Vertex2.Color / v[2].w) * z;
+//                                 Vector2 uv_p = (alpha * t.Vertex0.Texcoord / v[0].w + beta * t.Vertex1.Texcoord / v[1].w + gamma * t.Vertex2.Texcoord / v[2].w) * z;
+//                                 Vector3 normal_p = (alpha * t.Vertex0.Normal / v[0].w + beta * t.Vertex1.Normal  / v[1].w + gamma * t.Vertex2.Normal  / v[2].w) * z;
+//                                 Vector3 worldPos_p = (alpha * t.Vertex0.WorldPos / v[0].w + beta * t.Vertex1.WorldPos / v[1].w + gamma * t.Vertex2.WorldPos / v[2].w) * z;
+//                                 Vector3 worldNormal_p = (alpha * t.Vertex0.WorldNormal / v[0].w + beta * t.Vertex1.WorldNormal / v[1].w + gamma * t.Vertex2.WorldNormal / v[2].w) * z;
+//                                 ProfileManager.EndSample();
+
+//                                 if (CurrentFragmentShader != null)
+//                                 {
+//                                     FragmentShaderInputData input = new FragmentShaderInputData();
+//                                     input.Color = color_p;
+//                                     input.UV = uv_p;
+//                                     input.Texture = ro.texture;
+//                                     input.LocalNormal = normal_p;
+//                                     input.WorldPos = worldPos_p;
+//                                     input.WorldNormal = worldNormal_p;
+
+//                                     ProfileManager.BeginSample("Rasterizer.RasterizeTriangle.FragmentShader");
+//                                     frame_buf[index] = CurrentFragmentShader(input);
+//                                     ProfileManager.EndSample();
+//                                 }
+                                
+
+                                
+//                             }
+//                         }                        
+//                     }
+//                 }
+//             }
+            
+//             ProfileManager.EndSample();
+//         }

@@ -7,6 +7,7 @@ namespace URasterizer
     {        
         public Mesh mesh;
         public bool DoubleSideRendering;
+        [HideInInspector, System.NonSerialized]
         public Texture2D texture;
 
         //缓存避免在draw loop中从mesh copy
@@ -23,7 +24,10 @@ namespace URasterizer
 
         public ComputeBuffer VertexBuffer;
         public ComputeBuffer NormalBuffer;
-        public ComputeBuffer OutBuffer;
+        public ComputeBuffer TriangleBuffer;
+        public ComputeBuffer VertexOutBuffer;
+        
+        public ComputeBuffer RenderTriangleBuffer;
 
 
         private void Start()
@@ -47,23 +51,43 @@ namespace URasterizer
 
             //为了能在运行时动态切换是否使用 GPU Driven Rasterizer, 这里同时把GPU使用的Compute Buffer创建出来
             int vertexCnt = mesh.vertexCount;
-            VertexBuffer = new ComputeBuffer(vertexCnt, 3*sizeof(float));
-            VertexBuffer.name = "VertexBuffer";
+            VertexBuffer = new ComputeBuffer(vertexCnt, 3*sizeof(float));            
             VertexBuffer.SetData(MeshVertices);
             
-            NormalBuffer = new ComputeBuffer(vertexCnt, 3*sizeof(float));
-            NormalBuffer.name = "NormalBuffer";
+            NormalBuffer = new ComputeBuffer(vertexCnt, 3*sizeof(float));            
             NormalBuffer.SetData(MeshNormals);
+
+            //初始化三角形数组，每个三角形包含3个索引值
+            //注意这儿对调了v0和v1的索引，因为原来的 0,1,2是顺时针的，对调后是 1,0,2是逆时针的
+            //Unity Quard模型的两个三角形索引分别是 0,3,1,3,0,2 转换后为 3,0,1,0,3,2
+            int idxCnt = MeshTriangles.Length;
+            Vector3Int[] triangles = new Vector3Int[idxCnt/3];
+            for(int i=0; i < triangles.Length; ++i){
+                triangles[i].x = MeshTriangles[i*3+1];
+                triangles[i].y = MeshTriangles[i*3];
+                triangles[i].z = MeshTriangles[i*3+2];
+            }
+
+            TriangleBuffer = new ComputeBuffer(triangles.Length, 3*sizeof(uint));
+            TriangleBuffer.SetData(triangles);
             
-            OutBuffer = new ComputeBuffer(vertexCnt, 13*sizeof(float));
-            OutBuffer.name = "OutBuffer";
+            VertexOutBuffer = new ComputeBuffer(vertexCnt, 13*sizeof(float));            
+
+            RenderTriangleBuffer = new ComputeBuffer(MeshTriangles.Length/3, sizeof(uint)*3, ComputeBufferType.Append);
         }
 
         void OnDestroy()
         {
             VertexBuffer.Release();
+            VertexBuffer = null;
             NormalBuffer.Release();
-            OutBuffer.Release();
+            NormalBuffer = null;
+            VertexOutBuffer.Release();
+            VertexOutBuffer = null;
+            TriangleBuffer.Release();
+            TriangleBuffer = null;
+            RenderTriangleBuffer.Release();
+            RenderTriangleBuffer = null;
         }
 
 
