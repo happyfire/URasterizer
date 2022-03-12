@@ -10,6 +10,7 @@ namespace URasterizer
         [HideInInspector, System.NonSerialized]
         public Texture2D texture;
 
+#region CPU Rasterizer Use
         //缓存避免在draw loop中从mesh copy
         [HideInInspector, System.NonSerialized]
         public Vector3[] MeshVertices;
@@ -21,14 +22,17 @@ namespace URasterizer
         public Vector2[] MeshUVs;
         [HideInInspector, System.NonSerialized]
         public VSOutBuf[] vsOutputBuffer;
+#endregion        
 
+#region  GPU Rasterizer Use
         public ComputeBuffer VertexBuffer;
         public ComputeBuffer NormalBuffer;
+        public ComputeBuffer UVBuffer;
         public ComputeBuffer TriangleBuffer;
-        public ComputeBuffer VertexOutBuffer;
+        public ComputeBuffer VertexOutBuffer; //for vertex shader output
         
         public ComputeBuffer RenderTriangleBuffer;
-
+#endregion
 
         private void Start()
         {
@@ -43,7 +47,11 @@ namespace URasterizer
             {
                 texture = meshRenderer.sharedMaterial.mainTexture as Texture2D;
             }
+            if(texture==null){
+                texture = Texture2D.whiteTexture;
+            }
 
+            //CPU Rasterizer使用的模型数据缓存
             MeshVertices = mesh.vertices;
             MeshNormals = mesh.normals;
             MeshTriangles = mesh.triangles;
@@ -57,23 +65,25 @@ namespace URasterizer
             NormalBuffer = new ComputeBuffer(vertexCnt, 3*sizeof(float));            
             NormalBuffer.SetData(MeshNormals);
 
+            UVBuffer = new ComputeBuffer(vertexCnt, 2*sizeof(float));
+            UVBuffer.SetData(MeshUVs);
+
             //初始化三角形数组，每个三角形包含3个索引值
             //注意这儿对调了v0和v1的索引，因为原来的 0,1,2是顺时针的，对调后是 1,0,2是逆时针的
             //Unity Quard模型的两个三角形索引分别是 0,3,1,3,0,2 转换后为 3,0,1,0,3,2
-            int idxCnt = MeshTriangles.Length;
-            Vector3Int[] triangles = new Vector3Int[idxCnt/3];
-            for(int i=0; i < triangles.Length; ++i){
-                triangles[i].x = MeshTriangles[i*3+1];
-                triangles[i].y = MeshTriangles[i*3];
-                triangles[i].z = MeshTriangles[i*3+2];
+            int triCnt = MeshTriangles.Length/3;
+            Vector3Int[] triangles = new Vector3Int[triCnt];
+            for(int i=0; i < triCnt; ++i){
+                int j = i * 3;
+                triangles[i].x = MeshTriangles[j+1];
+                triangles[i].y = MeshTriangles[j];
+                triangles[i].z = MeshTriangles[j+2];
             }
 
             TriangleBuffer = new ComputeBuffer(triangles.Length, 3*sizeof(uint));
             TriangleBuffer.SetData(triangles);
             
-            VertexOutBuffer = new ComputeBuffer(vertexCnt, 13*sizeof(float));            
-
-            RenderTriangleBuffer = new ComputeBuffer(MeshTriangles.Length/3, sizeof(uint)*3, ComputeBufferType.Append);
+            VertexOutBuffer = new ComputeBuffer(vertexCnt, 15*sizeof(float));                        
         }
 
         void OnDestroy()
@@ -82,12 +92,12 @@ namespace URasterizer
             VertexBuffer = null;
             NormalBuffer.Release();
             NormalBuffer = null;
-            VertexOutBuffer.Release();
-            VertexOutBuffer = null;
+            UVBuffer.Release();
+            UVBuffer = null;
             TriangleBuffer.Release();
             TriangleBuffer = null;
-            RenderTriangleBuffer.Release();
-            RenderTriangleBuffer = null;
+            VertexOutBuffer.Release();
+            VertexOutBuffer = null;            
         }
 
 

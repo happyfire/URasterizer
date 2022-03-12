@@ -62,8 +62,12 @@
      <Compile Include="Assets\URasterizer\Codes\CPURasterizer.cs" />
      <Compile Include="Assets\URasterizer\Codes\GPURasterizer.cs" />
      <Compile Include="Assets\URasterizer\Codes\TransformTool.cs" />
+     <None Include="Assets\URasterizer\Shaders\URVertexShader.hlsl" />
      <None Include="Assets\URasterizer\DefaultAssets\DefaultShader.shader" />
-     <None Include="Assets\URasterizer\DefaultAssets\URComputeShader.compute" />
+     <None Include="Assets\URasterizer\Shaders\URCommon.hlsl" />
+     <None Include="Assets\URasterizer\Shaders\URTriangleProcess.hlsl" />
+     <None Include="Assets\URasterizer\Shaders\URFragmentShader.hlsl" />
+     <None Include="Assets\URasterizer\Shaders\URComputeShader.compute" />
  <Reference Include="UnityEngine">
  <HintPath>C:/Program Files/Unity/Hub/Editor/Unity 2020.3.25f1c1/Editor/Data/Managed/UnityEngine/UnityEngine.dll</HintPath>
  </Reference>

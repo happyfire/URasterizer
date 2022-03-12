@@ -6,23 +6,24 @@ namespace URasterizer {
     [CreateAssetMenu(menuName = "URasterizer/RenderingConfig")]
     public class RenderingConfig : ScriptableObject
     {
+        [Header("Common Setting")]
+        public bool EnableRendering = true;
         public Color ClearColor = Color.black;
+        public Color AmbientColor = Color.black;        
+        public RasterizerType RasterizerType;
+
+        [Header("CPU Rasterizer ONLY Setting")]
         public bool WireframeMode = false;
         public bool BackfaceCulling = true;
         public DisplayBufferType DisplayBuffer = DisplayBufferType.Color;
         public MSAALevel MSAA = MSAALevel.Disabled;
         public bool BilinearSample = true;
         public ShaderType FragmentShaderType = ShaderType.BlinnPhong;
-        public Color AmbientColor = Color.black;
-    
-        [Header("Vertex Color Setting")]
+                    
         public VertexColors VertexColors;
 
-        [Header("GPU Driven")]        
-        public ComputeShader ComputeShader;
-
-        [Header("Current Rasterizer")]
-        public RasterizerType RasterizerType;
+        [Header("GPU Driven Setting")]        
+        public ComputeShader ComputeShader;        
     }
 
     public enum DisplayBufferType

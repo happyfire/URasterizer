@@ -144,6 +144,32 @@ namespace URasterizer
             float f = -zFar;
             return GetPerspectiveProjectionMatrix(l, r, b, t, f, n);
         }
+
+        public static void SetupViewProjectionMatrix(Camera camera, float aspect, out Matrix4x4 ViewMatrix, out Matrix4x4 ProjectionMatrix)
+        {
+            //左手坐标系转右手坐标系,以下坐标和向量z取反
+            var camPos = camera.transform.position;
+            camPos.z *= -1; 
+            var lookAt = camera.transform.forward;
+            lookAt.z *= -1;
+            var up = camera.transform.up;
+            up.z *= -1;
+            
+            ViewMatrix = TransformTool.GetViewMatrix(camPos, lookAt, up);
+
+            if (camera.orthographic)
+            {
+                float halfOrthHeight = camera.orthographicSize;
+                float halfOrthWidth = halfOrthHeight * aspect;
+                float f = -camera.farClipPlane;
+                float n = -camera.nearClipPlane;
+                ProjectionMatrix = GetOrthographicProjectionMatrix(-halfOrthWidth, halfOrthWidth, -halfOrthHeight, halfOrthHeight, f, n);
+            }
+            else
+            {
+                ProjectionMatrix = GetPerspectiveProjectionMatrix(camera.fieldOfView, aspect, camera.nearClipPlane, camera.farClipPlane);
+            }
+        }
         
     }
 }

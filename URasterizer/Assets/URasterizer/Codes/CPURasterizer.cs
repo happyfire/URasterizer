@@ -13,25 +13,7 @@ namespace URasterizer
 
         Matrix4x4 _matModel;
         Matrix4x4 _matView;
-        Matrix4x4 _matProjection;
-
-        public Matrix4x4 ModelMatrix
-        {
-            get => _matModel;           
-            set => _matModel = value;            
-        }
-
-        public Matrix4x4 ViewMatrix
-        {
-            get => _matView;
-            set => _matView = value;
-        }
-
-        public Matrix4x4 ProjectionMatrix
-        {
-            get => _matProjection;
-            set => _matProjection = value;
-        }
+        Matrix4x4 _matProjection;        
 
         Color[] frame_buf;
         float[] depth_buf;
@@ -126,7 +108,7 @@ namespace URasterizer
 
         public void Clear(BufferMask mask)
         {
-            ProfileManager.BeginSample("Rasterizer.Clear");
+            ProfileManager.BeginSample("CPURasterizer.Clear");
 
             if (_config.MSAA != MSAALevel.Disabled && !_config.WireframeMode)
             {
@@ -156,43 +138,48 @@ namespace URasterizer
 
             ProfileManager.EndSample();
             
-        }
+        }        
 
-        public void SetupViewProjectionMatrix(Camera camera)
+        public void SetupUniforms(Camera camera, Light mainLight)
         {
-            //左手坐标系转右手坐标系,以下坐标和向量z取反
+            switch (_config.FragmentShaderType)
+            {
+                case ShaderType.VertexColor:
+                    CurrentFragmentShader = ShaderContext.FSVertexColor;
+                    break;
+                case ShaderType.BlinnPhong:
+                    CurrentFragmentShader = ShaderContext.FSBlinnPhong;
+                    break;
+                case ShaderType.NormalVisual:
+                    CurrentFragmentShader = ShaderContext.FSNormalVisual;
+                    break;
+                default:
+                    CurrentFragmentShader = ShaderContext.FSBlinnPhong;
+                    break;
+            }
+
+            ShaderContext.Config = _config;
+
             var camPos = camera.transform.position;
-            camPos.z *= -1; 
-            var lookAt = camera.transform.forward;
-            lookAt.z *= -1;
-            var up = camera.transform.up;
-            up.z *= -1;
-            
-            ViewMatrix = TransformTool.GetViewMatrix(camPos, lookAt, up);
+            camPos.z *= -1;
+            ShaderContext.Uniforms.WorldSpaceCameraPos = camPos;            
 
-            if (camera.orthographic)
-            {
-                float halfOrthHeight = camera.orthographicSize;
-                float halfOrthWidth = halfOrthHeight * Aspect;
-                float f = -camera.farClipPlane;
-                float n = -camera.nearClipPlane;
-                ProjectionMatrix = TransformTool.GetOrthographicProjectionMatrix(-halfOrthWidth, halfOrthWidth, -halfOrthHeight, halfOrthHeight, f, n);
-            }
-            else
-            {
-                ProjectionMatrix = TransformTool.GetPerspectiveProjectionMatrix(camera.fieldOfView, Aspect, camera.nearClipPlane, camera.farClipPlane);
-            }
+            var lightDir = mainLight.transform.forward;
+            lightDir.z *= -1;
+            ShaderContext.Uniforms.WorldSpaceLightDir = -lightDir;
+            ShaderContext.Uniforms.LightColor = mainLight.color * mainLight.intensity;
+            ShaderContext.Uniforms.AmbientColor = _config.AmbientColor;
+            
+            TransformTool.SetupViewProjectionMatrix(camera, Aspect, out _matView, out _matProjection);
         }
 
-        public void Draw(RenderingObject ro, Camera camera)
+        public void DrawObject(RenderingObject ro)
         {
-            ProfileManager.BeginSample("Rasterizer.Draw");
+            ProfileManager.BeginSample("CPURasterizer.DrawObject");
 
             Mesh mesh = ro.mesh;
-
-            SetupViewProjectionMatrix(camera);
-
-            ModelMatrix = ro.GetModelMatrix();                      
+            
+            _matModel = ro.GetModelMatrix();                      
 
             Matrix4x4 mvp = _matProjection * _matView * _matModel;
             Matrix4x4 normalMat = _matModel.inverse.transpose;
@@ -533,7 +520,7 @@ namespace URasterizer
 
         private void RasterizeWireframe(Triangle t)
         {
-            ProfileManager.BeginSample("Rasterizer.RasterizeWireframe");
+            ProfileManager.BeginSample("CPURasterizer.RasterizeWireframe");
             DrawLine(t.Vertex0.Position, t.Vertex1.Position, t.Vertex0.Color, t.Vertex1.Color);
             DrawLine(t.Vertex1.Position, t.Vertex2.Position, t.Vertex1.Color, t.Vertex2.Color);
             DrawLine(t.Vertex2.Position, t.Vertex0.Position, t.Vertex2.Color, t.Vertex0.Color);
@@ -547,7 +534,7 @@ namespace URasterizer
         //Screen space  rasterization
         void RasterizeTriangle(Triangle t, RenderingObject ro)
         {
-            ProfileManager.BeginSample("Rasterizer.RasterizeTriangle");
+            ProfileManager.BeginSample("CPURasterizer.RasterizeTriangle");
             var v = _tmpVector4s;
             v[0] = t.Vertex0.Position;
             v[1] = t.Vertex1.Position;
@@ -703,7 +690,7 @@ namespace URasterizer
 
         bool IsInsideTriangle(int x, int y, Triangle t, float offsetX=0.5f, float offsetY=0.5f)
         {
-            ProfileManager.BeginSample("Rasterizer.IsInsideTriangle");
+            ProfileManager.BeginSample("CPURasterizer.IsInsideTriangle");
             var v = _tmpVector3s;            
             v[0] = new Vector3(t.Vertex0.Position.x, t.Vertex0.Position.y, t.Vertex0.Position.z);
             v[1] = new Vector3(t.Vertex1.Position.x, t.Vertex1.Position.y, t.Vertex1.Position.z);
@@ -738,7 +725,7 @@ namespace URasterizer
 
         Vector3 ComputeBarycentric2D(float x, float y, Triangle t)
         {
-            ProfileManager.BeginSample("Rasterizer.ComputeBarycentric2D");
+            ProfileManager.BeginSample("CPURasterizer.ComputeBarycentric2D");
             var v = _tmpVector4s;            
             v[0] = t.Vertex0.Position;
             v[1] = t.Vertex1.Position;
@@ -770,7 +757,7 @@ namespace URasterizer
 
         public void UpdateFrame()
         {
-            ProfileManager.BeginSample("CameraRenderer.UpdateFrame");
+            ProfileManager.BeginSample("CPURasterizer.UpdateFrame");
 
             switch (_config.DisplayBuffer)
             {

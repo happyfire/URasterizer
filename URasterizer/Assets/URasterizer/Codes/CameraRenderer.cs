@@ -33,7 +33,9 @@ namespace URasterizer
 
         private void OnPostRender()
         {            
-            Render();            
+            if(_config.EnableRendering){
+                Render();            
+            }            
         }        
 
         void Init()
@@ -88,39 +90,14 @@ namespace URasterizer
             var r = _rasterizer;
             r.Clear(BufferMask.Color | BufferMask.Depth);
 
-            switch (_config.FragmentShaderType)
-            {
-                case ShaderType.VertexColor:
-                    r.CurrentFragmentShader = ShaderContext.FSVertexColor;
-                    break;
-                case ShaderType.BlinnPhong:
-                    r.CurrentFragmentShader = ShaderContext.FSBlinnPhong;
-                    break;
-                case ShaderType.NormalVisual:
-                    r.CurrentFragmentShader = ShaderContext.FSNormalVisual;
-                    break;
-                default:
-                    r.CurrentFragmentShader = ShaderContext.FSBlinnPhong;
-                    break;
-            }
-
-            ShaderContext.Config = _config;
-
-            var camPos = transform.position;
-            camPos.z *= -1;
-            ShaderContext.Uniforms.WorldSpaceCameraPos = camPos;            
-
-            var lightDir = _mainLight.transform.forward;
-            lightDir.z *= -1;
-            ShaderContext.Uniforms.WorldSpaceLightDir = -lightDir;
-            ShaderContext.Uniforms.LightColor = _mainLight.color * _mainLight.intensity;
-            ShaderContext.Uniforms.AmbientColor = _config.AmbientColor;
+            r.SetupUniforms(_camera, _mainLight);
+                        
             
             for (int i=0; i<renderingObjects.Count; ++i)
             {
                 if (renderingObjects[i].gameObject.activeInHierarchy)
                 {                    
-                    r.Draw(renderingObjects[i], _camera);
+                    r.DrawObject(renderingObjects[i]);
                 }
             }    
                                                     

@@ -6,12 +6,13 @@ namespace URasterizer
     {
         string Name { get; }
         void Clear(BufferMask mask);
-        void Draw(RenderingObject ro, Camera camera);
+
+        void SetupUniforms(Camera camera, Light mainLight);
+
+        void DrawObject(RenderingObject ro);
 
         Texture ColorTexture { get; }
 
-        void UpdateFrame();
-
-        FragmentShader CurrentFragmentShader { get; set; }
+        void UpdateFrame();        
     }
 }

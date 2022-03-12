@@ -1,0 +1,85 @@
+#pragma kernel VertexProcess
+#pragma kernel ClearFrame
+#pragma kernel TriangleProcess
+
+
+#include "URCommon.hlsl"
+#include "URVertexShader.hlsl"
+#include "URFragmentShader.hlsl"
+#include "URTriangleProcess.hlsl"
+
+
+
+[numthreads(32,24,1)]
+void ClearFrame(uint3 id : SV_DispatchThreadID)
+{
+    frameColorTexture[id.xy] = clearColor;
+    frameDepthTexture[id.xy] = 0;
+}
+
+[numthreads(512,1,1)]
+void VertexProcess (uint3 id : SV_DispatchThreadID)
+{
+    VertexTransform(id.x);  
+}
+
+[numthreads(512,1,1)]
+void TriangleProcess(uint3 id : SV_DispatchThreadID)
+{
+    uint3 tri = triangleBuffer[id.x];    
+    int idx0 = tri.x;
+    int idx1 = tri.y; 
+    int idx2 = tri.z; 
+
+    float4 v[3];
+    v[0] = vertexOutBuffer[idx0].clipPos;
+    v[1] = vertexOutBuffer[idx1].clipPos;
+    v[2] = vertexOutBuffer[idx2].clipPos;
+
+    if(Clipped(v)){
+       return; 
+    }
+    
+    //Perspective division, clip space to NDC
+    for (int k=0; k<3; k++)
+    {
+        v[k].x /= v[k].w;
+        v[k].y /= v[k].w;
+        v[k].z /= v[k].w;                  
+    }
+
+    //backface culling        
+    float3 e01 = v[1].xyz - v[0].xyz;
+    float3 e02 = v[2].xyz - v[0].xyz;
+    float3 crossv = cross(e01, e02);
+    if (crossv.z < 0)
+    {
+        return;
+    }
+
+    //Viewport Transform， NDC to screen space
+    for (k = 0; k < 3; k++)
+    {
+        float4 vec = v[k];
+        vec.x = 0.5f * frameBufferSize.x * (vec.x + 1.0f);
+        vec.y = 0.5f * frameBufferSize.y * (vec.y + 1.0f);
+
+        //在硬件渲染中，NDC的z值经过硬件的透视除法之后就直接写入到depth buffer了，如果要调整需要在投影矩阵中调整
+        //由于我们是软件渲染，所以可以在这里调整z值。                    
+
+        //GAMES101约定的NDC是右手坐标系，z值范围是[-1,1]，但n为1，f为-1，因此值越大越靠近n。                    
+        //为了可视化Depth buffer，将最终的z值从[-1,1]映射到[0,1]的范围，因此最终n为1, f为0。离n越近，深度值越大。                    
+        //由于远处的z值为0，因此clear时深度要清除为0，然后深度测试时，使用GREATER测试。
+        //(当然我们也可以在这儿反转z值，然后clear时使用float.MaxValue清除，并且深度测试时使用LESS_EQUAL测试)
+        //注意：这儿的z值调整并不是必要的，只是为了可视化时便于映射为颜色值。其实也可以在可视化的地方调整。
+        //但是这么调整后，正好和Unity在DirectX平台的Reverse z一样，让near plane附近的z值的浮点数精度提高。
+        vec.z = vec.z * 0.5f + 0.5f; 
+
+        v[k] = vec;
+    }
+
+    RasterizeTriangle(idx0, idx1, idx2, v);  
+}
+
+
+
