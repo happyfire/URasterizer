@@ -6,11 +6,11 @@ namespace URasterizer {
     [CreateAssetMenu(menuName = "URasterizer/RenderingConfig")]
     public class RenderingConfig : ScriptableObject
     {
-        [Header("Common Setting")]
-        public bool EnableRendering = true;
+        [Header("Common Setting")]        
         public Color ClearColor = Color.black;
         public Color AmbientColor = Color.black;        
         public RasterizerType RasterizerType;
+        public bool UseUnityNativeRendering;
 
         [Header("CPU Rasterizer ONLY Setting")]
         public bool WireframeMode = false;

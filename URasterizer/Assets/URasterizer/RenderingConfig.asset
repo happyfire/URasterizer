@@ -12,9 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5fa123a60a768444af03a384cb34a74, type: 3}
   m_Name: RenderingConfig
   m_EditorClassIdentifier: 
-  ClearColor: {r: 0, g: 0, b: 0, a: 1}
+  ClearColor: {r: 0, g: 0, b: 0, a: 0}
   AmbientColor: {r: 0.0754717, g: 0.0754717, b: 0.0754717, a: 1}
   RasterizerType: 1
+  UseUnityNativeRendering: 0
   WireframeMode: 0
   BackfaceCulling: 1
   DisplayBuffer: 0

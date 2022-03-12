@@ -26,15 +26,40 @@ namespace URasterizer
 
         StatsPanel _statsPanel;
 
+        bool _lastUseUnityNativeRendering;
+
         private void Start()
         {
             Init();
+            _lastUseUnityNativeRendering = _config.UseUnityNativeRendering;
+            OnOffUnityRendering();
+        }
+
+        void OnOffUnityRendering()
+        {
+            if(_config.UseUnityNativeRendering){
+                rawImg.gameObject.SetActive(false);
+                _camera.cullingMask = 0xfffffff;
+                _statsPanel.SetRasterizerType("Unity Native");
+            }
+            else{
+                rawImg.gameObject.SetActive(true);
+                _camera.cullingMask = 0;
+                if(_rasterizer!=null){
+                    _statsPanel.SetRasterizerType(_rasterizer.Name);
+                }
+            }
         }
 
         private void OnPostRender()
-        {            
-            if(_config.EnableRendering){
-                Render();            
+        {           
+            if(!_config.UseUnityNativeRendering){
+                Render();
+            }   
+
+            if(_lastUseUnityNativeRendering != _config.UseUnityNativeRendering){
+                OnOffUnityRendering();                                
+                _lastUseUnityNativeRendering = _config.UseUnityNativeRendering;
             }            
         }        
 

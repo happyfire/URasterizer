@@ -5,7 +5,7 @@ namespace URasterizer
     public enum RasterizerType
     {
         CPU,
-        GPUDriven,
+        GPUDriven
     }
     
     public enum BufferMask

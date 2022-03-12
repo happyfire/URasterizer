@@ -86,14 +86,14 @@ void RasterizeTriangle(int idx0, int idx1, int idx2, float4 v[3])
             float gamma = c.z;
             if(alpha < 0 || beta < 0 || gamma < 0){                                
                 continue;
-            }
+            }            
+
             //透视校正插值，z为透视校正插值后的view space z值
             float z = 1.0f / (alpha / v[0].w + beta / v[1].w + gamma / v[2].w);
             //zp为透视校正插值后的screen space z值
             float zp = (alpha * v[0].z / v[0].w + beta * v[1].z / v[1].w + gamma * v[2].z / v[2].w) * z;
             
-            //深度测试(注意我们这儿的z值越大越靠近near plane，因此大值通过测试）
-            
+            //深度测试(注意我们这儿的z值越大越靠近near plane，因此大值通过测试）            
             if(zp > frameDepthTexture[uint2(x,y)])
             {
                             
@@ -101,7 +101,6 @@ void RasterizeTriangle(int idx0, int idx1, int idx2, float4 v[3])
                 
                 //透视校正插值
                 
-                //float3 color_p = (alpha * t.Vertex0.Color / v[0].w + beta * t.Vertex1.Color / v[1].w + gamma * t.Vertex2.Color / v[2].w) * z;
                 float2 uv_p = (alpha * vertex0.uv / v[0].w + beta * vertex1.uv / v[1].w + gamma * vertex2.uv / v[2].w) * z;
                 float3 normal_p = (alpha * vertex0.objectNormal / v[0].w + beta * vertex1.objectNormal  / v[1].w + gamma * vertex2.objectNormal  / v[2].w) * z;
                 float3 worldPos_p = (alpha * vertex0.worldPos / v[0].w + beta * vertex1.worldPos / v[1].w + gamma * vertex2.worldPos / v[2].w) * z;
