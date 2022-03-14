@@ -14,6 +14,7 @@ namespace URasterizer {
 
         [Header("CPU Rasterizer ONLY Setting")]
         public bool WireframeMode = false;
+        public bool FrustumCulling = true;
         public bool BackfaceCulling = true;
         public DisplayBufferType DisplayBuffer = DisplayBufferType.Color;
         public MSAALevel MSAA = MSAALevel.Disabled;

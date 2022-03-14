@@ -83,7 +83,7 @@ namespace URasterizer
             TriangleBuffer = new ComputeBuffer(triangles.Length, 3*sizeof(uint));
             TriangleBuffer.SetData(triangles);
             
-            VertexOutBuffer = new ComputeBuffer(vertexCnt, 15*sizeof(float));                        
+            VertexOutBuffer = new ComputeBuffer(vertexCnt, 15*sizeof(float));             
         }
 
         void OnDestroy()

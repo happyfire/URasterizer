@@ -35,6 +35,7 @@ namespace URasterizer
 
         //优化GC
         Vector4[] _tmpVector4s = new Vector4[3];
+        Vector4[] _tmp8Vector4s = new Vector4[8];
         Vector3[] _tmpVector3s = new Vector3[3];
 
         public String Name { get=>"CPU"; }
@@ -173,6 +174,100 @@ namespace URasterizer
             TransformTool.SetupViewProjectionMatrix(camera, Aspect, out _matView, out _matProjection);
         }
 
+        //在ClipSpace中，判断OBB顶点是否在视锥外部。输入v为clip space下OBB的8个顶点
+        //该函数使用的是保守视锥剔除算法，对于每个裁剪面都检查OBB的所有顶点是否在它外面，如果都在则剔除
+        //该算法是保守的，不会错误剔除掉不该剔除的OBB，但是可能有一些特殊位置的OBB剔除不掉，
+        //比如当OBB比较大且在视锥外，但是同时和左右近3个面相交，这样这3个面就无法成功判断剔除。
+        //这种情况一般是离镜头很近的大的墙体，可能会剔除不掉，造成性能问题。
+        //可参考：https://www.iquilezles.org/www/articles/frustumcorrect/frustumcorrect.htm        
+        bool CheckVerticesOutFrustumClipSpace(Vector4[] v)
+        {           
+            //left
+            int cnt = 0;
+            for(int i=0; i < 8; ++i){                
+                var w = v[i].w >=0 ? v[i].w : -v[i].w;
+                if(v[i].x < -w){
+                    ++cnt;
+                }
+                if(cnt==8){
+                    return true;
+                }
+            }            
+            //right
+            cnt = 0;
+            for(int i=0; i < 8; ++i){
+                var w = v[i].w >=0 ? v[i].w : -v[i].w;
+                if(v[i].x > w){
+                    ++cnt;
+                }
+                if(cnt==8){
+                    return true;
+                }
+            }    
+            //bottom
+            cnt = 0;
+            for(int i=0; i < 8; ++i){
+                var w = v[i].w >=0 ? v[i].w : -v[i].w;
+                if(v[i].y < -w){
+                    ++cnt;
+                }
+                if(cnt==8){
+                    return true;
+                }
+            }    
+            //top
+            cnt = 0;
+            for(int i=0; i < 8; ++i){                
+                var w = v[i].w >=0 ? v[i].w : -v[i].w;
+                if(v[i].y > w){
+                    ++cnt;
+                }
+                if(cnt==8){
+                    return true;
+                }
+            }    
+            //near
+            cnt = 0;
+            for(int i=0; i < 8; ++i){
+                var w = v[i].w >=0 ? v[i].w : -v[i].w;
+                if(v[i].z < -w){
+                    ++cnt;
+                }
+                if(cnt==8){
+                    return true;
+                }
+            }    
+            //far
+            cnt = 0;
+            for(int i=0; i < 8; ++i){
+                var w = v[i].w >=0 ? v[i].w : -v[i].w;
+                if(v[i].z > w){
+                    ++cnt;
+                }
+                if(cnt==8){
+                    return true;
+                }
+            }    
+            return false;                       
+        }
+
+        bool FrustumCulling(Bounds localAABB, Matrix4x4 mvp)
+        {
+            var v = _tmp8Vector4s;
+            var min = localAABB.min; min.z = -min.z;
+            var max = localAABB.max; max.z = -max.z;
+            v[0] = mvp * new Vector4(min.x, min.y, min.z, 1.0f);
+            v[1] = mvp * new Vector4(min.x, min.y, max.z, 1.0f);
+            v[2] = mvp * new Vector4(min.x, max.y, min.z, 1.0f);
+            v[3] = mvp * new Vector4(min.x, max.y, max.z, 1.0f);
+            v[4] = mvp * new Vector4(max.x, min.y, min.z, 1.0f);
+            v[5] = mvp * new Vector4(max.x, min.y, max.z, 1.0f);
+            v[6] = mvp * new Vector4(max.x, max.y, min.z, 1.0f);
+            v[7] = mvp * new Vector4(max.x, max.y, max.z, 1.0f);
+            
+            return CheckVerticesOutFrustumClipSpace(v);
+        }
+
         public void DrawObject(RenderingObject ro)
         {
             ProfileManager.BeginSample("CPURasterizer.DrawObject");
@@ -182,6 +277,11 @@ namespace URasterizer
             _matModel = ro.GetModelMatrix();                      
 
             Matrix4x4 mvp = _matProjection * _matView * _matModel;
+            if(_config.FrustumCulling && FrustumCulling(mesh.bounds, mvp)){                
+                ProfileManager.EndSample();
+                return;
+            }
+
             Matrix4x4 normalMat = _matModel.inverse.transpose;
 
             _verticesAll += mesh.vertexCount;
@@ -206,7 +306,7 @@ namespace URasterizer
                 var normal = ro.MeshNormals[i];
                 var objNormal = new Vector3(normal.x, normal.y, -normal.z);
                 vsOutput[i].objectNormal = objNormal;
-                vsOutput[i].worldNormal = _matModel * objNormal;
+                vsOutput[i].worldNormal = normalMat * objNormal;
             }
             ProfileManager.EndSample();            
             
@@ -380,28 +480,70 @@ namespace URasterizer
         //硬件实现时一般只对部分顶点z值在near,far之间的图元进行clipping操作，
         //而部分顶点x,y值在x,y裁剪平面之间的图元则不进行裁剪，只是通过一个比viewport更大一些的guard-band区域进行整体剔除（相当于放大x,y的测试范围）
         //这样x,y裁剪平面之间的图元最终在frame buffer上进行Scissor测试。
-        //此处的实现简化为只整体剔除，不做任何clipping操作。对于x,y裁剪没问题，虽然没扩大region,也可以最后在frame buffer上裁剪掉。
+        //此处的实现简化为只整体的视锥剔除，不做任何clipping操作。对于x,y裁剪没问题，虽然没扩大region,也可以最后在frame buffer上裁剪掉。
         //对于z的裁剪由于没有处理，会看到整个三角形消失导致的边缘不齐整
+
+        //直接使用Clip space下的视锥剔除算法                    
         bool Clipped(Vector4[] v)
+        {            
+            //分别检查视锥体的六个面，如果三角形所有三个顶点都在某个面之外，则该三角形在视锥外，剔除  
+            //由于NDC中总是满足-1<=Zndc<=1, 而当 w < 0 时，-w >= Zclip = Zndc*w >= w。所以此时clip space的坐标范围是[w,-w], 为了比较时更明确，将w取正      
+            var v0 = v[0];
+            var w0 = v0.w >=0 ? v0.w : -v0.w;
+            var v1 = v[1];
+            var w1 = v1.w >=0 ? v1.w : -v1.w;
+            var v2 = v[2];
+            var w2 = v2.w >=0 ? v2.w : -v2.w;
+            
+            //left
+            if(v0.x < -w0 && v1.x < -w1 && v2.x < -w2){
+                return true;
+            }
+            //right
+            if(v0.x > w0 && v1.x > w1 && v2.x > w2){
+                return true;
+            }
+            //bottom
+            if(v0.y < -w0 && v1.y < -w1 && v2.y < -w2){
+                return true;
+            }
+            //top
+            if(v0.y > w0 && v1.y > w1 && v2.y > w2){
+                return true;
+            }
+            //near
+            if(v0.z < -w0 && v1.z < -w1 && v2.z < -w2){
+                return true;
+            }
+            //far
+            if(v0.z > w0 && v1.z > w1 && v2.z > w2){
+                return true;
+            }
+            return false;       
+        }
+
+        //Clipped_old的算法只检查顶点是否在视锥内。但是当三角形特别大，穿过视锥且所有顶点都在视锥外时，会错误认为是要剔除的 (false negative)
+        bool Clipped_old(Vector4[] v)
         {
             //Clip space使用GAMES101规范，右手坐标系，n为+1， f为-1
             //裁剪（仅整体剔除）     
-            //实际的硬件是在Clip space裁剪，所以此处我们也使用clip space （当然由于我们不真正的裁剪，只是整体剔除，所以其实在NDC操作更方便）
+            //实际的硬件是在Clip space裁剪，所以此处我们也使用clip space
             for (int i = 0; i < 3; ++i)
             {
                 var vertex = v[i];
                 var w = vertex.w;
-                w = w >= 0 ? w : -w; //由于NDC中总是满足-1<=Zndc<=1, 而当 w < 0 时，-w >= Zclip = Zndc*w >= w。所以此时clip space的坐标范围是[w,-w], 为了比较时更明确，将w取正
+                w = w >= 0 ? w : -w;
                 
                 bool inside = (vertex.x <= w && vertex.x >= -w
                     && vertex.y <= w && vertex.y >= -w
                     && vertex.z <= w && vertex.z >= -w);
+                
                 if (inside)
                 {             
-                    //不裁剪三角形，只要有任意一点在clip space中则三角形整体保留
+                    //不裁剪三角形，只要有任意一点在clip space中则三角形整体保留                    
                     return false;
                 }
-            }
+            }                
 
             //三个顶点都不在三角形中则剔除
             return true;

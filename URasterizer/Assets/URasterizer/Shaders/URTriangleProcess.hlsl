@@ -1,26 +1,39 @@
-
 bool Clipped(float4 v[3])
 {
-    //Clip space使用GAMES101规范，右手坐标系，n为+1， f为-1
-    //裁剪（仅整体剔除）                 
-    for (int i = 0; i < 3; ++i)
-    {
-        float4 vertex = v[i];
-        float w = vertex.w;
-        w = w >= 0 ? w : -w; //由于NDC中总是满足-1<=Zndc<=1, 而当 w < 0 时，-w >= Zclip = Zndc*w >= w。所以此时clip space的坐标范围是[w,-w], 为了比较时更明确，将w取正
-        
-        bool inside = (vertex.x <= w && vertex.x >= -w
-            && vertex.y <= w && vertex.y >= -w
-            && vertex.z <= w && vertex.z >= -w);
-        if (inside)
-        {             
-            //不裁剪三角形，只要有任意一点在clip space中则三角形整体保留
-            return false;
-        }
+    //分别检查视锥体的六个面，如果三角形所有三个顶点都在某个面之外，则该三角形在视锥外，剔除  
+    //由于NDC中总是满足-1<=Zndc<=1, 而当 w < 0 时，-w >= Zclip = Zndc*w >= w。所以此时clip space的坐标范围是[w,-w], 为了比较时更明确，将w取正      
+    float4 v0 = v[0];
+    float w0 = v0.w >=0 ? v0.w : -v0.w;
+    float4 v1 = v[1];
+    float w1 = v1.w >=0 ? v1.w : -v1.w;
+    float4 v2 = v[2];
+    float w2 = v2.w >=0 ? v2.w : -v2.w;
+    
+    //left
+    if(v0.x < -w0 && v1.x < -w1 && v2.x < -w2){
+        return true;
     }
-
-    //三个顶点都不在三角形中则剔除
-    return true;
+    //right
+    if(v0.x > w0 && v1.x > w1 && v2.x > w2){
+        return true;
+    }
+    //bottom
+    if(v0.y < -w0 && v1.y < -w1 && v2.y < -w2){
+        return true;
+    }
+    //top
+    if(v0.y > w0 && v1.y > w1 && v2.y > w2){
+        return true;
+    }
+    //near
+    if(v0.z < -w0 && v1.z < -w1 && v2.z < -w2){
+        return true;
+    }
+    //far
+    if(v0.z > w0 && v1.z > w1 && v2.z > w2){
+        return true;
+    }
+    return false;            
 }
 
 
