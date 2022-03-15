@@ -6,6 +6,9 @@ URasterizer有两个独立的光栅化渲染器：
 
 本项目的目的是学习研究光栅化以及利用GPGPU加速光栅化，GPU Driven算法主要是针对小三角形比较有优势，并不适合通用的光栅化。
 
+* 本项目github仓库地址：https://github.com/happyfire/URasterizer
+* 图片不能显示请访问gitcode镜像仓库：https://gitcode.net/n5/urasterizer
+
 # 支持特性
 (部分仅CPU Rasterizer支持)
 * Wireframe mode
