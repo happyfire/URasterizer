@@ -1,6 +1,6 @@
 using System;
-using System.Collections.Generic;
 using UnityEngine;
+using System.Runtime.CompilerServices;
 
 namespace URasterizer
 {    
@@ -483,7 +483,8 @@ namespace URasterizer
         //此处的实现简化为只整体的视锥剔除，不做任何clipping操作。对于x,y裁剪没问题，虽然没扩大region,也可以最后在frame buffer上裁剪掉。
         //对于z的裁剪由于没有处理，会看到整个三角形消失导致的边缘不齐整
 
-        //直接使用Clip space下的视锥剔除算法                    
+        //直接使用Clip space下的视锥剔除算法   
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]                 
         bool Clipped(Vector4[] v)
         {            
             //分别检查视锥体的六个面，如果三角形所有三个顶点都在某个面之外，则该三角形在视锥外，剔除  
@@ -794,13 +795,16 @@ namespace URasterizer
                             {
                                 float offsetx = sampler_dis_half + si * sampler_dis;
                                 float offsety = sampler_dis_half + sj * sampler_dis;
-                                if (IsInsideTriangle(x, y, t, offsetx, offsety))
+                                //if (IsInsideTriangle(x, y, t, offsetx, offsety))
                                 {
                                     //计算重心坐标
                                     var c = ComputeBarycentric2D(x+offsetx, y+offsety, t);
                                     float alpha = c.x;
                                     float beta = c.y;
                                     float gamma = c.z;
+                                    if(alpha < 0 || beta < 0 || gamma < 0){                                
+                                        continue;
+                                    }
                                     //透视校正插值，z为透视校正插值后的view space z值
                                     float z = 1.0f / (alpha / v[0].w + beta / v[1].w + gamma / v[2].w);
                                     //zp为透视校正插值后的screen space z值
@@ -830,6 +834,7 @@ namespace URasterizer
             ProfileManager.EndSample();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         bool IsInsideTriangle(int x, int y, Triangle t, float offsetX=0.5f, float offsetY=0.5f)
         {
             ProfileManager.BeginSample("CPURasterizer.IsInsideTriangle");
@@ -865,6 +870,7 @@ namespace URasterizer
             return false;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         Vector3 ComputeBarycentric2D(float x, float y, Triangle t)
         {
             ProfileManager.BeginSample("CPURasterizer.ComputeBarycentric2D");
@@ -881,11 +887,13 @@ namespace URasterizer
             return new Vector3(c1, c2, c3);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int GetIndex(int x, int y)
         {
             return y * _width + x;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetPixel(Vector3 point, Color color)
         {
             if(point.x < 0 || point.x >= _width || point.y < 0 || point.y >= _height)

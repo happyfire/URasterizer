@@ -22,6 +22,6 @@ MonoBehaviour:
   DisplayBuffer: 0
   MSAA: 0
   BilinearSample: 1
-  FragmentShaderType: 0
+  FragmentShaderType: 1
   VertexColors: {fileID: 11400000, guid: a126a2fdc8a60c54e8a3aadb7db4bb3a, type: 2}
   ComputeShader: {fileID: 7200000, guid: caa96f337395ad9449e1be41546efcd6, type: 3}
