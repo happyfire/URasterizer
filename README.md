@@ -41,8 +41,11 @@ URasterizer有两个独立的光栅化渲染器：
 ![Rendering Config](URasterizer/Readme/rendering_config.png)
 ## CPU 渲染效果（BlinnPhong着色）
 ![CPU BlinnPhong](URasterizer/Readme/cpu_blinnphong.png)
-## GPU 渲染效果，FPS极大提高
+## GPU 渲染效果
+### FPS极大提高
 ![GPU BlinnPhong](URasterizer/Readme/gpu_blinnphong.png)
+### 在测试机上，远远没到瓶颈，渲染更多的三角形也不影响帧率
+![GPU BlinnPhong2](URasterizer/Readme/gpu_blinnphong2.png)
 ## 线框模式，使用自定义顶点色
 ![wireframe](URasterizer/Readme/cpu_wireframe.png)
 ## 可视化顶点色
