@@ -36,21 +36,21 @@
     <ImplicitlyExpandDesignTimeFacades>false</ImplicitlyExpandDesignTimeFacades>
   </PropertyGroup>
   <ItemGroup>
-     <Compile Include="Assets\URasterizer\Codes\HandmakeMesh.cs" />
-     <Compile Include="Assets\URasterizer\Codes\FPSDisplay.cs" />
-     <Compile Include="Assets\URasterizer\Codes\ProfileManager.cs" />
+     <Compile Include="Assets\URasterizer\Codes\Common\HandmakeMesh.cs" />
+     <Compile Include="Assets\URasterizer\Codes\Common\FPSDisplay.cs" />
+     <Compile Include="Assets\URasterizer\Codes\Common\ProfileManager.cs" />
      <Compile Include="Assets\URasterizer\Codes\IRasterizer.cs" />
-     <Compile Include="Assets\URasterizer\Codes\FragmentShader.cs" />
-     <Compile Include="Assets\URasterizer\Codes\CommonDef.cs" />
-     <Compile Include="Assets\URasterizer\Codes\RenderingObject.cs" />
-     <Compile Include="Assets\URasterizer\Codes\VertexColors.cs" />
-     <Compile Include="Assets\URasterizer\Codes\RenderingConfig.cs" />
-     <Compile Include="Assets\URasterizer\Codes\StatsPanel.cs" />
+     <Compile Include="Assets\URasterizer\Codes\CPURasterizer\FragmentShader.cs" />
+     <Compile Include="Assets\URasterizer\Codes\Common\CommonDef.cs" />
+     <Compile Include="Assets\URasterizer\Codes\Common\RenderingObject.cs" />
+     <Compile Include="Assets\URasterizer\Codes\Common\VertexColors.cs" />
+     <Compile Include="Assets\URasterizer\Codes\Common\RenderingConfig.cs" />
+     <Compile Include="Assets\URasterizer\Codes\Common\StatsPanel.cs" />
      <Compile Include="Assets\URasterizer\Codes\CameraRenderer.cs" />
-     <Compile Include="Assets\URasterizer\Codes\Triangle.cs" />
-     <Compile Include="Assets\URasterizer\Codes\CPURasterizer.cs" />
+     <Compile Include="Assets\URasterizer\Codes\CPURasterizer\Triangle.cs" />
+     <Compile Include="Assets\URasterizer\Codes\CPURasterizer\CPURasterizer.cs" />
      <Compile Include="Assets\URasterizer\Codes\GPURasterizer.cs" />
-     <Compile Include="Assets\URasterizer\Codes\TransformTool.cs" />
+     <Compile Include="Assets\URasterizer\Codes\Common\TransformTool.cs" />
      <None Include="Assets\URasterizer\Shaders\URVertexShader.hlsl" />
      <None Include="Assets\URasterizer\DefaultAssets\DefaultShader.shader" />
      <None Include="Assets\URasterizer\Shaders\URCommon.hlsl" />
