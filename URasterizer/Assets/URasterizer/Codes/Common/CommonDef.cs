@@ -5,6 +5,7 @@ namespace URasterizer
     public enum RasterizerType
     {
         CPU,
+        CPUJobs,
         GPUDriven
     }
     

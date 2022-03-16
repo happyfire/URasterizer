@@ -11,6 +11,8 @@ namespace URasterizer
         IRasterizer _lastRasterizer;
 
         CPURasterizer _cpuRasterizer;
+
+        JobRasterizer _jobRasterizer;
         GPURasterizer _gpuRasterizer;
 
         public RawImage rawImg;        
@@ -84,11 +86,14 @@ namespace URasterizer
             Debug.Log($"screen size: {w}x{h}");
 
             _cpuRasterizer = new CPURasterizer(w, h, _config);
+            _jobRasterizer = new JobRasterizer(w, h, _config);
             _gpuRasterizer = new GPURasterizer(w, h, _config);
+            _lastRasterizer = null;
 
             _statsPanel = this.GetComponent<StatsPanel>();
             if (_statsPanel != null) {
                 _cpuRasterizer.StatDelegate += _statsPanel.StatDelegate;
+                _jobRasterizer.StatDelegate += _statsPanel.StatDelegate;
                 _gpuRasterizer.StatDelegate += _statsPanel.StatDelegate;
             }
         }
@@ -98,14 +103,20 @@ namespace URasterizer
         {
             ProfileManager.BeginSample("CameraRenderer.Render");
 
-            if(_config.RasterizerType == RasterizerType.GPUDriven && _config.ComputeShader != null){
-                _rasterizer = _gpuRasterizer;                
-            }
-            else{
-                _rasterizer = _cpuRasterizer;                
-            }
+            switch(_config.RasterizerType){
+                case RasterizerType.CPU:
+                    _rasterizer = _cpuRasterizer;
+                    break;
+                case RasterizerType.CPUJobs:
+                    _rasterizer = _jobRasterizer;
+                    break;
+                case RasterizerType.GPUDriven:
+                    _rasterizer = _gpuRasterizer;
+                    break;
+            }            
 
             if(_rasterizer != _lastRasterizer){
+                Debug.Log($"Change Rasterizer to {_rasterizer.Name}");
                 _lastRasterizer = _rasterizer;
                 
                 rawImg.texture = _rasterizer.ColorTexture;

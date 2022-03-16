@@ -164,7 +164,7 @@ namespace URasterizer
             Matrix4x4 mvp = _matProjection * _matView * _matModel;
             Matrix4x4 normalMat = _matModel.inverse.transpose;
 
-            int triangleCount = ro.MeshTriangles.Length / 3;
+            int triangleCount = ro.cpuData.MeshTriangles.Length / 3;
 
             _verticesAll += mesh.vertexCount;
             _trianglesAll += triangleCount;                           
@@ -174,10 +174,10 @@ namespace URasterizer
             var shader = _config.ComputeShader;            
             shader.SetMatrix(matMVPId, mvp);
             shader.SetMatrix(matModelId, _matModel);
-            shader.SetBuffer(kernelVertexProcess, vertexBufferId, ro.VertexBuffer);
-            shader.SetBuffer(kernelVertexProcess, normalBufferId, ro.NormalBuffer);
-            shader.SetBuffer(kernelVertexProcess, uvBufferId, ro.UVBuffer);
-            shader.SetBuffer(kernelVertexProcess, vertexOutBufferId, ro.VertexOutBuffer);
+            shader.SetBuffer(kernelVertexProcess, vertexBufferId, ro.gpuData.VertexBuffer);
+            shader.SetBuffer(kernelVertexProcess, normalBufferId, ro.gpuData.NormalBuffer);
+            shader.SetBuffer(kernelVertexProcess, uvBufferId, ro.gpuData.UVBuffer);
+            shader.SetBuffer(kernelVertexProcess, vertexOutBufferId, ro.gpuData.VertexOutBuffer);
             
             int groupCnt = Mathf.CeilToInt(mesh.vertexCount/512f);            
             shader.Dispatch(kernelVertexProcess, groupCnt, 1, 1);                          
@@ -187,8 +187,8 @@ namespace URasterizer
             ProfileManager.BeginSample("GPURasterizer.TriangleProcess");
 
             shader.SetInts(frameBufferSizeId, _colorTexture.width, _colorTexture.height);            
-            shader.SetBuffer(kernelTriangleProcess, triangleBufferId, ro.TriangleBuffer);            
-            shader.SetBuffer(kernelTriangleProcess, vertexOutBufferId, ro.VertexOutBuffer);            
+            shader.SetBuffer(kernelTriangleProcess, triangleBufferId, ro.gpuData.TriangleBuffer);            
+            shader.SetBuffer(kernelTriangleProcess, vertexOutBufferId, ro.gpuData.VertexOutBuffer);            
             shader.SetTexture(kernelTriangleProcess, frameColorTextureId, _colorTexture);   
             shader.SetTexture(kernelTriangleProcess, frameDepthTextureId, _depthTexture);   
             shader.SetTexture(kernelTriangleProcess, meshTextureId, ro.texture);

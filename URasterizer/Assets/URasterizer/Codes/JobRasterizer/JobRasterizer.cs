@@ -1,10 +1,12 @@
 using System;
 using UnityEngine;
 using System.Runtime.CompilerServices;
+using Unity.Collections;
+using Unity.Jobs;
 
 namespace URasterizer
 {    
-    public class CPURasterizer : IRasterizer
+    public class JobRasterizer : IRasterizer
     {
         int _width;
         int _height;
@@ -38,14 +40,14 @@ namespace URasterizer
         Vector4[] _tmp8Vector4s = new Vector4[8];
         Vector3[] _tmpVector3s = new Vector3[3];
 
-        public String Name { get=>"CPU"; }
+        public String Name { get=>"CPU Jobs"; }
 
         public Texture ColorTexture { get=>texture; }
 
 
-        public CPURasterizer(int w, int h, RenderingConfig config)
+        public JobRasterizer(int w, int h, RenderingConfig config)
         {
-            Debug.Log($"CPU Rasterizer screen size: {w}x{h}");
+            Debug.Log($"Job Rasterizer screen size: {w}x{h}");
 
             _config = config;
 
@@ -109,7 +111,7 @@ namespace URasterizer
 
         public void Clear(BufferMask mask)
         {
-            ProfileManager.BeginSample("CPURasterizer.Clear");
+            ProfileManager.BeginSample("JobRasterizer.Clear");
 
             if (_config.MSAA != MSAALevel.Disabled && !_config.WireframeMode)
             {
@@ -270,7 +272,7 @@ namespace URasterizer
 
         public void DrawObject(RenderingObject ro)
         {
-            ProfileManager.BeginSample("CPURasterizer.DrawObject");
+            ProfileManager.BeginSample("JobRasterizer.DrawObject");
 
             Mesh mesh = ro.mesh;
             
@@ -296,18 +298,23 @@ namespace URasterizer
             /// ------------- Vertex Shader -------------------
             VSOutBuf[] vsOutput = ro.cpuData.vsOutputBuffer;                   
             
-            ProfileManager.BeginSample("Rasterizer.VertexShader CPU");
-            for(int i=0; i<mesh.vertexCount; ++i)
-            {                
-                var vert = ro.cpuData.MeshVertices[i];        
-                var objVert = new Vector4(vert.x, vert.y, -vert.z, 1); //注意这儿反转了z坐标
-                vsOutput[i].clipPos = mvp * objVert;
-                vsOutput[i].worldPos = _matModel * objVert;
-                var normal = ro.cpuData.MeshNormals[i];
-                var objNormal = new Vector3(normal.x, normal.y, -normal.z);
-                vsOutput[i].objectNormal = objNormal;
-                vsOutput[i].worldNormal = normalMat * objNormal;
-            }
+            ProfileManager.BeginSample("JobRasterizer.VertexShader");
+
+            NativeArray<VSOutBuf> vsOutResult = new NativeArray<VSOutBuf>(mesh.vertexCount, Allocator.TempJob);
+
+            VertexShadingJob vsJob = new VertexShadingJob();            
+            vsJob.inputData = ro.jobData.inputData;
+            vsJob.mvpMat = mvp;
+            vsJob.modelMat = _matModel;
+            vsJob.normalMat = normalMat;
+            vsJob.result = vsOutResult;
+
+            JobHandle handle = vsJob.Schedule(vsOutResult.Length, 1);
+            handle.Complete();
+            
+            vsOutResult.Dispose();
+
+            
             ProfileManager.EndSample();            
             
             ProfileManager.BeginSample("Rasterizer.PrimitiveAssembly");
