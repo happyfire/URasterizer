@@ -103,6 +103,12 @@ namespace URasterizer
             ambientColorId = Shader.PropertyToID("ambientColor");
             meshTextureId = Shader.PropertyToID("meshTexture");
         }
+
+        public void Release()
+        {
+            _colorTexture = null;
+            _depthTexture = null;
+        }
         
 
         public float Aspect

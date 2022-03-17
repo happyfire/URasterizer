@@ -13,6 +13,8 @@ namespace URasterizer
 
         Texture ColorTexture { get; }
 
-        void UpdateFrame();        
+        void UpdateFrame();  
+
+        void Release();      
     }
 }

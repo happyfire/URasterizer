@@ -8,7 +8,9 @@ namespace URasterizer
     public struct VertexShadingJob : IJobParallelFor
     {
         [ReadOnly]
-        public NativeArray<RenderInputData> inputData;        
+        public NativeArray<Vector3> positionData;        
+        [ReadOnly]
+        public NativeArray<Vector3> normalData;        
 
         public Matrix4x4 mvpMat;
         public Matrix4x4 modelMat;
@@ -17,10 +19,9 @@ namespace URasterizer
         public NativeArray<VSOutBuf> result;
 
         public void Execute(int index)
-        {
-            RenderInputData input = inputData[index];
-            var vert = input.vertex;
-            var normal = input.normal;
+        {            
+            var vert = positionData[index];
+            var normal = normalData[index];
             var output = result[index];
 
             var objVert = new Vector4(vert.x, vert.y, -vert.z, 1);

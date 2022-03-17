@@ -98,6 +98,13 @@ namespace URasterizer
             }
         }
 
+        void OnDestroy()
+        {
+            _cpuRasterizer.Release();
+            _jobRasterizer.Release();
+            _gpuRasterizer.Release();
+        }
+
 
         void Render()
         {

@@ -1,10 +1,24 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Unity.Collections;
 
 namespace URasterizer
 {
     //Shader在世界空间下计算
+
+    public struct URColor24
+    {
+        public byte r;
+        public byte g;
+        public byte b;
+
+        public static implicit operator Color(URColor24 c)
+        {
+            float s = 1/255f;
+            return new Color(c.r * s, c.g * s, c.b * s, 1);            
+        }
+    }
 
     public struct FragmentShaderInputData
     {
@@ -12,8 +26,10 @@ namespace URasterizer
         public Vector3 WorldNormal;
         public Vector3 LocalNormal;
         public Color Color;
-        public Vector2 UV;
-        public Texture2D Texture;
+        public Vector2 UV;        
+        public NativeArray<URColor24> TextureData; //因为我们的纹理都是RGB格式的(24位)，所以不能用Color32(32位)
+        public int TextureWidth;
+        public int TextureHeight;
     }
 
     public struct ShaderUniforms
@@ -45,21 +61,29 @@ namespace URasterizer
 
         public static Color FSBlinnPhong(FragmentShaderInputData input)
         {
-            Color textureColor = Color.white;
-            if (input.Texture != null)
-            {
-                int w = input.Texture.width;
-                int h = input.Texture.height;
-                if (Config.BilinearSample)
-                {
-                    textureColor = input.Texture.GetPixelBilinear(input.UV.x, input.UV.y);
-                }
-                else
-                {
-                    textureColor = input.Texture.GetPixel((int)(w * input.UV.x), (int)(h * input.UV.y));
-                }
+            
+            int w = input.TextureWidth;
+            int h = input.TextureHeight;
+            int x = (int)(w * input.UV.x);
+            int y = (int)(h * input.UV.y);
+            int tidx = y*w + x;
+                                    
+            URColor24 c = input.TextureData[tidx];            
+            Color textureColor = (URColor24)c;
+            // if (input.Texture != null)
+            // {
+            //     int w = input.Texture.width;
+            //     int h = input.Texture.height;
+            //     if (Config.BilinearSample)
+            //     {
+            //         textureColor = input.Texture.GetPixelBilinear(input.UV.x, input.UV.y);
+            //     }
+            //     else
+            //     {
+            //         textureColor = input.Texture.GetPixel((int)(w * input.UV.x), (int)(h * input.UV.y));
+            //     }
                 
-            }
+            // }
                         
             Color ambient = Uniforms.AmbientColor;
 

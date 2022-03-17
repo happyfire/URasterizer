@@ -34,8 +34,7 @@ namespace URasterizer
         public OnRasterizerStatUpdate StatDelegate;
 
         //优化GC
-        Vector4[] _tmpVector4s = new Vector4[3];
-        Vector4[] _tmp8Vector4s = new Vector4[8];
+        Vector4[] _tmpVector4s = new Vector4[3];        
         Vector3[] _tmpVector3s = new Vector3[3];
 
         public String Name { get=>"CPU"; }
@@ -77,6 +76,17 @@ namespace URasterizer
             }            
         }
 
+        public void Release()
+        {
+            texture = null;
+            frame_buf = null;
+            depth_buf = null;
+            temp_buf = null;
+            samplers_color_MSAA = null;            
+            samplers_mask_MSAA = null; 
+            samplers_depth_MSAA = null;   
+        }
+
         public float Aspect
         {
             get
@@ -85,27 +95,7 @@ namespace URasterizer
             }
         }
 
-        void FillArray<T>(T[] arr, T value)
-        {
-            int i = 0;
-            if(arr.Length > 16)
-            {
-                do
-                {
-                    arr[i++] = value;
-                } while (i < arr.Length);
-
-                while( i + 16 < arr.Length)
-                {
-                    Array.Copy(arr, 0, arr, i, 16);
-                    i += 16;
-                }
-            }
-            while (i < arr.Length)
-            {
-                arr[i++] = value;
-            }
-        }
+        
 
         public void Clear(BufferMask mask)
         {
@@ -118,19 +108,19 @@ namespace URasterizer
 
             if ((mask & BufferMask.Color) == BufferMask.Color)
             {                
-                FillArray(frame_buf, _config.ClearColor);
+                URUtils.FillArray(frame_buf, _config.ClearColor);
                 if (_config.MSAA != MSAALevel.Disabled && !_config.WireframeMode)
                 {
-                    FillArray(samplers_color_MSAA, _config.ClearColor);
-                    FillArray(samplers_mask_MSAA, false);
+                    URUtils.FillArray(samplers_color_MSAA, _config.ClearColor);
+                    URUtils.FillArray(samplers_mask_MSAA, false);
                 }
             }
             if((mask & BufferMask.Depth) == BufferMask.Depth)
             {
-                FillArray(depth_buf, 0f);
+                URUtils.FillArray(depth_buf, 0f);
                 if (_config.MSAA != MSAALevel.Disabled && !_config.WireframeMode)
                 {
-                    FillArray(samplers_depth_MSAA, 0f);
+                    URUtils.FillArray(samplers_depth_MSAA, 0f);
                 }
             }
 
@@ -174,99 +164,7 @@ namespace URasterizer
             TransformTool.SetupViewProjectionMatrix(camera, Aspect, out _matView, out _matProjection);
         }
 
-        //在ClipSpace中，判断OBB顶点是否在视锥外部。输入v为clip space下OBB的8个顶点
-        //该函数使用的是保守视锥剔除算法，对于每个裁剪面都检查OBB的所有顶点是否在它外面，如果都在则剔除
-        //该算法是保守的，不会错误剔除掉不该剔除的OBB，但是可能有一些特殊位置的OBB剔除不掉，
-        //比如当OBB比较大且在视锥外，但是同时和左右近3个面相交，这样这3个面就无法成功判断剔除。
-        //这种情况一般是离镜头很近的大的墙体，可能会剔除不掉，造成性能问题。
-        //可参考：https://www.iquilezles.org/www/articles/frustumcorrect/frustumcorrect.htm        
-        bool CheckVerticesOutFrustumClipSpace(Vector4[] v)
-        {           
-            //left
-            int cnt = 0;
-            for(int i=0; i < 8; ++i){                
-                var w = v[i].w >=0 ? v[i].w : -v[i].w;
-                if(v[i].x < -w){
-                    ++cnt;
-                }
-                if(cnt==8){
-                    return true;
-                }
-            }            
-            //right
-            cnt = 0;
-            for(int i=0; i < 8; ++i){
-                var w = v[i].w >=0 ? v[i].w : -v[i].w;
-                if(v[i].x > w){
-                    ++cnt;
-                }
-                if(cnt==8){
-                    return true;
-                }
-            }    
-            //bottom
-            cnt = 0;
-            for(int i=0; i < 8; ++i){
-                var w = v[i].w >=0 ? v[i].w : -v[i].w;
-                if(v[i].y < -w){
-                    ++cnt;
-                }
-                if(cnt==8){
-                    return true;
-                }
-            }    
-            //top
-            cnt = 0;
-            for(int i=0; i < 8; ++i){                
-                var w = v[i].w >=0 ? v[i].w : -v[i].w;
-                if(v[i].y > w){
-                    ++cnt;
-                }
-                if(cnt==8){
-                    return true;
-                }
-            }    
-            //near
-            cnt = 0;
-            for(int i=0; i < 8; ++i){
-                var w = v[i].w >=0 ? v[i].w : -v[i].w;
-                if(v[i].z < -w){
-                    ++cnt;
-                }
-                if(cnt==8){
-                    return true;
-                }
-            }    
-            //far
-            cnt = 0;
-            for(int i=0; i < 8; ++i){
-                var w = v[i].w >=0 ? v[i].w : -v[i].w;
-                if(v[i].z > w){
-                    ++cnt;
-                }
-                if(cnt==8){
-                    return true;
-                }
-            }    
-            return false;                       
-        }
-
-        bool FrustumCulling(Bounds localAABB, Matrix4x4 mvp)
-        {
-            var v = _tmp8Vector4s;
-            var min = localAABB.min; min.z = -min.z;
-            var max = localAABB.max; max.z = -max.z;
-            v[0] = mvp * new Vector4(min.x, min.y, min.z, 1.0f);
-            v[1] = mvp * new Vector4(min.x, min.y, max.z, 1.0f);
-            v[2] = mvp * new Vector4(min.x, max.y, min.z, 1.0f);
-            v[3] = mvp * new Vector4(min.x, max.y, max.z, 1.0f);
-            v[4] = mvp * new Vector4(max.x, min.y, min.z, 1.0f);
-            v[5] = mvp * new Vector4(max.x, min.y, max.z, 1.0f);
-            v[6] = mvp * new Vector4(max.x, max.y, min.z, 1.0f);
-            v[7] = mvp * new Vector4(max.x, max.y, max.z, 1.0f);
-            
-            return CheckVerticesOutFrustumClipSpace(v);
-        }
+        
 
         public void DrawObject(RenderingObject ro)
         {
@@ -277,7 +175,7 @@ namespace URasterizer
             _matModel = ro.GetModelMatrix();                      
 
             Matrix4x4 mvp = _matProjection * _matView * _matModel;
-            if(_config.FrustumCulling && FrustumCulling(mesh.bounds, mvp)){                
+            if(_config.FrustumCulling && URUtils.FrustumCulling(mesh.bounds, mvp)){                
                 ProfileManager.EndSample();
                 return;
             }
@@ -761,7 +659,9 @@ namespace URasterizer
                                     FragmentShaderInputData input = new FragmentShaderInputData();
                                     input.Color = color_p;
                                     input.UV = uv_p;
-                                    input.Texture = ro.texture;
+                                    input.TextureData = ro.texture.GetPixelData<URColor24>(0);
+                                    input.TextureWidth = ro.texture.width;
+                                    input.TextureHeight = ro.texture.height;
                                     input.LocalNormal = normal_p;
                                     input.WorldPos = worldPos_p;
                                     input.WorldNormal = worldNormal_p;
