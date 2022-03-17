@@ -191,6 +191,7 @@ namespace URasterizer
             triJob.TextureData = ro.texture.GetPixelData<URColor24>(0);
             triJob.TextureWidth = ro.texture.width;
             triJob.TextureHeight = ro.texture.height;
+            triJob.UseBilinear = _config.BilinearSample;
             triJob.fsType = _config.FragmentShaderType;
             JobHandle triHandle = triJob.Schedule(ro.jobData.trianglesData.Length, 1, vsHandle);
 

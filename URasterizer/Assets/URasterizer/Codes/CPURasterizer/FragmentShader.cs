@@ -1,7 +1,7 @@
-using System.Collections;
-using System.Collections.Generic;
+
 using UnityEngine;
 using Unity.Collections;
+using System.Runtime.CompilerServices;
 
 namespace URasterizer
 {
@@ -30,6 +30,7 @@ namespace URasterizer
         public NativeArray<URColor24> TextureData; //因为我们的纹理都是RGB格式的(24位)，所以不能用Color32(32位)
         public int TextureWidth;
         public int TextureHeight;
+        public bool UseBilinear;
     }
 
     public struct ShaderUniforms
@@ -54,36 +55,60 @@ namespace URasterizer
         public static ShaderUniforms Uniforms;
         public static RenderingConfig Config;
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Color FSVertexColor(FragmentShaderInputData input)
         {
             return input.Color;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static Color GetTextureColor(NativeArray<URColor24> textureData, int w, int h, int x, int y)
+        {      
+            int tidx = y*w + x;                                    
+            URColor24 c = textureData[tidx];            
+            return (Color)c;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Color FSBlinnPhong(FragmentShaderInputData input)
         {
-            
+            Color textureColor;
             int w = input.TextureWidth;
             int h = input.TextureHeight;
-            int x = (int)(w * input.UV.x);
-            int y = (int)(h * input.UV.y);
-            int tidx = y*w + x;
-                                    
-            URColor24 c = input.TextureData[tidx];            
-            Color textureColor = (URColor24)c;
-            // if (input.Texture != null)
-            // {
-            //     int w = input.Texture.width;
-            //     int h = input.Texture.height;
-            //     if (Config.BilinearSample)
-            //     {
-            //         textureColor = input.Texture.GetPixelBilinear(input.UV.x, input.UV.y);
-            //     }
-            //     else
-            //     {
-            //         textureColor = input.Texture.GetPixel((int)(w * input.UV.x), (int)(h * input.UV.y));
-            //     }
-                
-            // }
+                        
+            if(input.UseBilinear)
+            {
+                float u_img = input.UV.x * w;
+                int u_img_i = (int)(u_img);
+                int u0 = u_img < u_img_i + 0.5 ? u_img_i - 1 : u_img_i;
+                if(u0<0) u0 = 0;
+                int u1 = u0 + 1;
+                float s = u_img - (u0 + 0.5f);
+
+                float v_img = input.UV.y * h;
+                int v_img_i = (int)(v_img);        
+                int v0 = v_img < v_img_i + 0.5 ? v_img_i-1 : v_img_i;
+                if(v0<0) v0 = 0;
+                int v1 = v0 + 1;
+                float t = v_img - (v0 + 0.5f); 
+
+                var color_00 = GetTextureColor(input.TextureData, w, h, u0, v0);
+                var color_10 = GetTextureColor(input.TextureData, w, h, u1, v0);
+                var color_0 = Color.Lerp(color_00, color_10, s);
+
+                var color_01 = GetTextureColor(input.TextureData, w, h, u0, v1);
+                var color_11 = GetTextureColor(input.TextureData, w, h, u1, v1);
+                var color_1 = Color.Lerp(color_01, color_11, s);
+
+                textureColor = Color.Lerp(color_0, color_1, t);
+
+            }
+            else
+            {
+                int x = (int)(w * input.UV.x);
+                int y = (int)(h * input.UV.y);                            
+                textureColor = GetTextureColor(input.TextureData, w, h, x, y);
+            }            
                         
             Color ambient = Uniforms.AmbientColor;
 
@@ -104,6 +129,7 @@ namespace URasterizer
             return ambient + diffuse + specular;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Color FSNormalVisual(FragmentShaderInputData input)
         {
             Vector3 tmp = input.LocalNormal * 0.5f + new Vector3(0.5f,0.5f,0.5f);

@@ -25,7 +25,9 @@ namespace URasterizer
         [ReadOnly]
         public NativeArray<URColor24> TextureData;   
         public int TextureWidth;
-        public int TextureHeight;     
+        public int TextureHeight;  
+
+        public bool UseBilinear;   
 
         public ShaderType fsType;                 
                 
@@ -258,6 +260,7 @@ namespace URasterizer
                         input.TextureData = TextureData;
                         input.TextureWidth = TextureWidth;
                         input.TextureHeight = TextureHeight;
+                        input.UseBilinear = UseBilinear;
                         input.LocalNormal = normal_p;
                         input.WorldPos = worldPos_p;
                         input.WorldNormal = worldNormal_p;

@@ -36,6 +36,7 @@
     <ImplicitlyExpandDesignTimeFacades>false</ImplicitlyExpandDesignTimeFacades>
   </PropertyGroup>
   <ItemGroup>
+     <Compile Include="Assets\URasterizer\Codes\JobRasterizer\VertexJob.cs" />
      <Compile Include="Assets\URasterizer\Codes\Common\HandmakeMesh.cs" />
      <Compile Include="Assets\URasterizer\Codes\Common\FPSDisplay.cs" />
      <Compile Include="Assets\URasterizer\Codes\Common\ProfileManager.cs" />
@@ -43,6 +44,7 @@
      <Compile Include="Assets\URasterizer\Codes\CPURasterizer\FragmentShader.cs" />
      <Compile Include="Assets\URasterizer\Codes\JobRasterizer\TriangleJob.cs" />
      <Compile Include="Assets\URasterizer\Codes\Common\IRenderObjectData.cs" />
+     <Compile Include="Assets\URasterizer\Codes\Common\URUtils.cs" />
      <Compile Include="Assets\URasterizer\Codes\JobRasterizer\JobRenderObjectData.cs" />
      <Compile Include="Assets\URasterizer\Codes\Common\CommonDef.cs" />
      <Compile Include="Assets\URasterizer\Codes\RenderingObject.cs" />
@@ -57,14 +59,12 @@
      <Compile Include="Assets\URasterizer\Codes\CPURasterizer\CPURasterizer.cs" />
      <Compile Include="Assets\URasterizer\Codes\GPURasterizer\GPURasterizer.cs" />
      <Compile Include="Assets\URasterizer\Codes\Common\TransformTool.cs" />
-     <Compile Include="Assets\URasterizer\Codes\Common\URUtils.cs" />
-     <Compile Include="Assets\URasterizer\Codes\JobRasterizer\VertexJob.cs" />
-     <None Include="Assets\URasterizer\Shaders\URVertexShader.hlsl" />
+     <None Include="Assets\URasterizer\Codes\GPURasterizer\Shaders\URVertexShader.hlsl" />
      <None Include="Assets\URasterizer\DefaultAssets\DefaultShader.shader" />
-     <None Include="Assets\URasterizer\Shaders\URCommon.hlsl" />
-     <None Include="Assets\URasterizer\Shaders\URTriangleProcess.hlsl" />
-     <None Include="Assets\URasterizer\Shaders\URFragmentShader.hlsl" />
-     <None Include="Assets\URasterizer\Shaders\URComputeShader.compute" />
+     <None Include="Assets\URasterizer\Codes\GPURasterizer\Shaders\URCommon.hlsl" />
+     <None Include="Assets\URasterizer\Codes\GPURasterizer\Shaders\URTriangleProcess.hlsl" />
+     <None Include="Assets\URasterizer\Codes\GPURasterizer\Shaders\URFragmentShader.hlsl" />
+     <None Include="Assets\URasterizer\Codes\GPURasterizer\Shaders\URComputeShader.compute" />
     <Reference Include="UnityEngine">
         <HintPath>C:\Program Files\Unity\Hub\Editor\Unity 2020.3.25f1c1\Editor\Data\Managed\UnityEngine\UnityEngine.dll</HintPath>
     </Reference>

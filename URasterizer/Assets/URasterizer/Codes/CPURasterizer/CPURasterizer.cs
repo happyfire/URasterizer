@@ -662,6 +662,7 @@ namespace URasterizer
                                     input.TextureData = ro.texture.GetPixelData<URColor24>(0);
                                     input.TextureWidth = ro.texture.width;
                                     input.TextureHeight = ro.texture.height;
+                                    input.UseBilinear = _config.BilinearSample;
                                     input.LocalNormal = normal_p;
                                     input.WorldPos = worldPos_p;
                                     input.WorldNormal = worldNormal_p;
