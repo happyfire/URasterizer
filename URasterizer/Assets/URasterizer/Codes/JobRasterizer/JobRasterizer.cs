@@ -158,15 +158,7 @@ namespace URasterizer
 
             _verticesAll += mesh.vertexCount;
             _trianglesAll += ro.cpuData.MeshTriangles.Length / 3;
-            
-
-            //Unity模型本地坐标系也是左手系，需要转成我们使用的右手系
-            //1. z轴反转
-            //2. 三角形顶点环绕方向从顺时针改成逆时针
-
-
-            /// ------------- Vertex Shader -------------------                                 
-            ProfileManager.BeginSample("JobRasterizer.VertexShader");
+                       
 
             NativeArray<VSOutBuf> vsOutResult = new NativeArray<VSOutBuf>(mesh.vertexCount, Allocator.TempJob);
 
@@ -177,8 +169,7 @@ namespace URasterizer
             vsJob.modelMat = _matModel;
             vsJob.normalMat = normalMat;
             vsJob.result = vsOutResult;
-
-            JobHandle vsHandle = vsJob.Schedule(vsOutResult.Length, 1);            
+            JobHandle vsHandle = vsJob.Schedule(vsOutResult.Length, 1);                        
 
             TriangleJob triJob = new TriangleJob();            
             triJob.trianglesData = ro.jobData.trianglesData;
@@ -193,14 +184,10 @@ namespace URasterizer
             triJob.TextureHeight = ro.texture.height;
             triJob.UseBilinear = _config.BilinearSample;
             triJob.fsType = _config.FragmentShaderType;
-            JobHandle triHandle = triJob.Schedule(ro.jobData.trianglesData.Length, 1, vsHandle);
-
+            JobHandle triHandle = triJob.Schedule(ro.jobData.trianglesData.Length, 2, vsHandle);
             triHandle.Complete();
-            vsOutResult.Dispose();
 
-            
-            ProfileManager.EndSample();                                    
-            
+            vsOutResult.Dispose();
         }        
 
     
