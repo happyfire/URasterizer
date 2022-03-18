@@ -33,42 +33,41 @@ namespace URasterizer
                 
 
         public void Execute(int index)
-        {
-            var _tmpVector4s = new Vector4[3];
-
+        {            
             Vector3Int triangle = trianglesData[index];
             int idx0 = triangle.x;
             int idx1 = triangle.y;
             int idx2 = triangle.z;
 
-            Vector4[] v = _tmpVector4s;
-
-            v[0] = vsOutput[idx0].clipPos;
-            v[1] = vsOutput[idx1].clipPos;
-            v[2] = vsOutput[idx2].clipPos;                                  
+            var v0 = vsOutput[idx0].clipPos;
+            var v1 = vsOutput[idx1].clipPos;
+            var v2 = vsOutput[idx2].clipPos;                                  
                 
             // ------ Clipping -------
-            if (Clipped(v))
+            if (Clipped(v0, v1, v2))
             {
                 return;
             }                
 
             // ------- Perspective division --------
             //clip space to NDC
-            for (int k=0; k<3; k++)
-            {
-                v[k].x /= v[k].w;
-                v[k].y /= v[k].w;
-                v[k].z /= v[k].w;                  
-            }
+            v0.x /= v0.w;
+            v0.y /= v0.w;
+            v0.z /= v0.w;
+            v1.x /= v1.w;
+            v1.y /= v1.w;
+            v1.z /= v1.w;
+            v2.x /= v2.w;
+            v2.y /= v2.w;
+            v2.z /= v2.w;                                            
 
             //backface culling                
             {
-                Vector3 v0 = new Vector3(v[0].x, v[0].y, v[0].z);
-                Vector3 v1 = new Vector3(v[1].x, v[1].y, v[1].z);
-                Vector3 v2 = new Vector3(v[2].x, v[2].y, v[2].z);
-                Vector3 e01 = v1 - v0;
-                Vector3 e02 = v2 - v0;
+                Vector3 t0 = new Vector3(v0.x, v0.y, v0.z);
+                Vector3 t1 = new Vector3(v1.x, v1.y, v1.z);
+                Vector3 t2 = new Vector3(v2.x, v2.y, v2.z);
+                Vector3 e01 = t1 - t0;
+                Vector3 e02 = t2 - t0;
                 Vector3 cross = Vector3.Cross(e01, e02);
                 if (cross.z < 0)
                 {
@@ -77,21 +76,26 @@ namespace URasterizer
             }
 
             // ------- Viewport Transform ----------
-            //NDC to screen space
-            for (int k = 0; k < 3; k++)
+            //NDC to screen space            
             {
-                var vec = v[k];
-                vec.x = 0.5f * screenWidth * (vec.x + 1.0f);
-                vec.y = 0.5f * screenHeight * (vec.y + 1.0f);                
-                vec.z = vec.z * 0.5f + 0.5f; 
 
-                v[k] = vec;
+                v0.x = 0.5f * screenWidth * (v0.x + 1.0f);
+                v0.y = 0.5f * screenHeight * (v0.y + 1.0f);                
+                v0.z = v0.z * 0.5f + 0.5f; 
+
+                v1.x = 0.5f * screenWidth * (v1.x + 1.0f);
+                v1.y = 0.5f * screenHeight * (v1.y + 1.0f);                
+                v1.z = v1.z * 0.5f + 0.5f; 
+
+                v2.x = 0.5f * screenWidth * (v2.x + 1.0f);
+                v2.y = 0.5f * screenHeight * (v2.y + 1.0f);                
+                v2.z = v2.z * 0.5f + 0.5f; 
             }
 
             Triangle t = new Triangle();
-            t.Vertex0.Position = v[0];
-            t.Vertex1.Position = v[1];
-            t.Vertex2.Position = v[2];                
+            t.Vertex0.Position = v0;
+            t.Vertex1.Position = v1;
+            t.Vertex2.Position = v2;                
 
             //set obj normal
             t.Vertex0.Normal = vsOutput[idx0].objectNormal;
@@ -115,19 +119,17 @@ namespace URasterizer
             t.Vertex1.WorldNormal = vsOutput[idx1].worldNormal;
             t.Vertex2.WorldNormal = vsOutput[idx2].worldNormal;
 
-            RasterizeTriangle(t, v);
+            RasterizeTriangle(t);
             
         }
 
-        bool Clipped(Vector4[] v)
+        bool Clipped(Vector4 v0, Vector4 v1, Vector4 v2)
         {            
             //分别检查视锥体的六个面，如果三角形所有三个顶点都在某个面之外，则该三角形在视锥外，剔除  
             //由于NDC中总是满足-1<=Zndc<=1, 而当 w < 0 时，-w >= Zclip = Zndc*w >= w。所以此时clip space的坐标范围是[w,-w], 为了比较时更明确，将w取正      
-            var v0 = v[0];
-            var w0 = v0.w >=0 ? v0.w : -v0.w;
-            var v1 = v[1];
-            var w1 = v1.w >=0 ? v1.w : -v1.w;
-            var v2 = v[2];
+            
+            var w0 = v0.w >=0 ? v0.w : -v0.w;            
+            var w1 = v1.w >=0 ? v1.w : -v1.w;            
             var w2 = v2.w >=0 ? v2.w : -v2.w;
             
             //left
@@ -157,19 +159,15 @@ namespace URasterizer
             return false;       
         }
         
-        Vector3 ComputeBarycentric2D(float x, float y, Triangle t, Vector4[] _tmpVector4s)
-        {
-            ProfileManager.BeginSample("JobRasterizer.ComputeBarycentric2D");
-            var v = _tmpVector4s;            
-            v[0] = t.Vertex0.Position;
-            v[1] = t.Vertex1.Position;
-            v[2] = t.Vertex2.Position;
+        Vector3 ComputeBarycentric2D(float x, float y, Triangle t)
+        {                      
+            var v0 = t.Vertex0.Position;
+            var v1 = t.Vertex1.Position;
+            var v2 = t.Vertex2.Position;
             
-            float c1 = (x * (v[1].y - v[2].y) + (v[2].x - v[1].x) * y + v[1].x * v[2].y - v[2].x * v[1].y) / (v[0].x * (v[1].y - v[2].y) + (v[2].x - v[1].x) * v[0].y + v[1].x * v[2].y - v[2].x * v[1].y);
-            float c2 = (x * (v[2].y - v[0].y) + (v[0].x - v[2].x) * y + v[2].x * v[0].y - v[0].x * v[2].y) / (v[1].x * (v[2].y - v[0].y) + (v[0].x - v[2].x) * v[1].y + v[2].x * v[0].y - v[0].x * v[2].y);
-            float c3 = (x * (v[0].y - v[1].y) + (v[1].x - v[0].x) * y + v[0].x * v[1].y - v[1].x * v[0].y) / (v[2].x * (v[0].y - v[1].y) + (v[1].x - v[0].x) * v[2].y + v[0].x * v[1].y - v[1].x * v[0].y);
-            
-            ProfileManager.EndSample();
+            float c1 = (x * (v1.y - v2.y) + (v2.x - v1.x) * y + v1.x * v2.y - v2.x * v1.y) / (v0.x * (v1.y - v2.y) + (v2.x - v1.x) * v0.y + v1.x * v2.y - v2.x * v1.y);
+            float c2 = (x * (v2.y - v0.y) + (v0.x - v2.x) * y + v2.x * v0.y - v0.x * v2.y) / (v1.x * (v2.y - v0.y) + (v0.x - v2.x) * v1.y + v2.x * v0.y - v0.x * v2.y);
+            float c3 = (x * (v0.y - v1.y) + (v1.x - v0.x) * y + v0.x * v1.y - v1.x * v0.y) / (v2.x * (v0.y - v1.y) + (v1.x - v0.x) * v2.y + v0.x * v1.y - v1.x * v0.y);
             return new Vector3(c1, c2, c3);
         }
         
@@ -178,38 +176,18 @@ namespace URasterizer
             return y * screenWidth + x;
         }
 
-        void RasterizeTriangle(Triangle t, Vector4[] _tmpVector4s)
-        {            
-            var v = _tmpVector4s;
-            v[0] = t.Vertex0.Position;
-            v[1] = t.Vertex1.Position;
-            v[2] = t.Vertex2.Position;            
+        void RasterizeTriangle(Triangle t)
+        {                        
+            var v0 = t.Vertex0.Position;
+            var v1 = t.Vertex1.Position;
+            var v2 = t.Vertex2.Position;            
             
             //Find out the bounding box of current triangle.
-            float minX = v[0].x;
-            float maxX = minX;
-            float minY = v[0].y;
-            float maxY = minY;
-
-            for(int i=1; i<3; ++i)
-            {
-                float x = v[i].x;
-                if(x < minX)
-                {
-                    minX = x;
-                } else if(x > maxX)
-                {
-                    maxX = x;
-                }
-                float y = v[i].y;
-                if(y < minY)
-                {
-                    minY = y;
-                }else if(y > maxY)
-                {
-                    maxY = y;
-                }
-            }
+            float minX = (v0.x < v1.x) ? ((v0.x < v2.x)?v0.x : (v1.x < v2.x)?v1.x:v2.x) : ((v1.x < v2.x)?v1.x:(v0.x < v2.x)?v0.x:v2.x);
+            float maxX = (v0.x > v1.x) ? ((v0.x > v2.x)?v0.x : (v1.x > v2.x)?v1.x:v2.x) : ((v1.x > v2.x)?v1.x:(v0.x > v2.x)?v0.x:v2.x);
+            float minY = (v0.y < v1.y) ? ((v0.y < v2.y)?v0.y : (v1.y < v2.y)?v1.y:v2.y) : ((v1.y < v2.y)?v1.y:(v0.y < v2.y)?v0.y:v2.y);
+            float maxY = (v0.y > v1.y) ? ((v0.y > v2.y)?v0.y : (v1.y > v2.y)?v1.y:v2.y) : ((v1.y > v2.y)?v1.y:(v0.y > v2.y)?v0.y:v2.y);                        
+                                        
 
             int minPX = Mathf.FloorToInt(minX);
             minPX = minPX < 0 ? 0 : minPX;
@@ -229,7 +207,7 @@ namespace URasterizer
                 for(int x = minPX; x < maxPX; ++x)
                 {                                        
                     //计算重心坐标
-                    var c = ComputeBarycentric2D(x, y, t, v);
+                    var c = ComputeBarycentric2D(x, y, t);
                     float alpha = c.x;
                     float beta = c.y;
                     float gamma = c.z;
@@ -237,9 +215,9 @@ namespace URasterizer
                         continue;
                     }
                     //透视校正插值，z为透视校正插值后的view space z值
-                    float z = 1.0f / (alpha / v[0].w + beta / v[1].w + gamma / v[2].w);
+                    float z = 1.0f / (alpha / v0.w + beta / v1.w + gamma / v2.w);
                     //zp为透视校正插值后的screen space z值
-                    float zp = (alpha * v[0].z / v[0].w + beta * v[1].z / v[1].w + gamma * v[2].z / v[2].w) * z;
+                    float zp = (alpha * v0.z / v0.w + beta * v1.z / v1.w + gamma * v2.z / v2.w) * z;
                     
                     //深度测试(注意我们这儿的z值越大越靠近near plane，因此大值通过测试）
                     int index = GetIndex(x, y);
@@ -248,11 +226,11 @@ namespace URasterizer
                         depthBuffer[index] = zp;
                         
                         //透视校正插值                            
-                        Color color_p = (alpha * t.Vertex0.Color / v[0].w + beta * t.Vertex1.Color / v[1].w + gamma * t.Vertex2.Color / v[2].w) * z;
-                        Vector2 uv_p = (alpha * t.Vertex0.Texcoord / v[0].w + beta * t.Vertex1.Texcoord / v[1].w + gamma * t.Vertex2.Texcoord / v[2].w) * z;
-                        Vector3 normal_p = (alpha * t.Vertex0.Normal / v[0].w + beta * t.Vertex1.Normal  / v[1].w + gamma * t.Vertex2.Normal  / v[2].w) * z;
-                        Vector3 worldPos_p = (alpha * t.Vertex0.WorldPos / v[0].w + beta * t.Vertex1.WorldPos / v[1].w + gamma * t.Vertex2.WorldPos / v[2].w) * z;
-                        Vector3 worldNormal_p = (alpha * t.Vertex0.WorldNormal / v[0].w + beta * t.Vertex1.WorldNormal / v[1].w + gamma * t.Vertex2.WorldNormal / v[2].w) * z;                            
+                        Color color_p = (alpha * t.Vertex0.Color / v0.w + beta * t.Vertex1.Color / v1.w + gamma * t.Vertex2.Color / v2.w) * z;
+                        Vector2 uv_p = (alpha * t.Vertex0.Texcoord / v0.w + beta * t.Vertex1.Texcoord / v1.w + gamma * t.Vertex2.Texcoord / v2.w) * z;
+                        Vector3 normal_p = (alpha * t.Vertex0.Normal / v0.w + beta * t.Vertex1.Normal  / v1.w + gamma * t.Vertex2.Normal  / v2.w) * z;
+                        Vector3 worldPos_p = (alpha * t.Vertex0.WorldPos / v0.w + beta * t.Vertex1.WorldPos / v1.w + gamma * t.Vertex2.WorldPos / v2.w) * z;
+                        Vector3 worldNormal_p = (alpha * t.Vertex0.WorldNormal / v0.w + beta * t.Vertex1.WorldNormal / v1.w + gamma * t.Vertex2.WorldNormal / v2.w) * z;                            
                         
                         FragmentShaderInputData input = new FragmentShaderInputData();
                         input.Color = color_p;

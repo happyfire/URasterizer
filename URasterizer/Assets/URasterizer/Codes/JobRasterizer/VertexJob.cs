@@ -2,9 +2,11 @@ using System;
 using UnityEngine;
 using Unity.Jobs;
 using Unity.Collections;
+using Unity.Burst;
 
 namespace URasterizer
-{ 
+{
+    [BurstCompile]
     public struct VertexShadingJob : IJobParallelFor
     {
         [ReadOnly]
