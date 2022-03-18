@@ -2,9 +2,11 @@ using System;
 using UnityEngine;
 using Unity.Jobs;
 using Unity.Collections;
+using Unity.Burst;
 
 namespace URasterizer
-{ 
+{
+    [BurstCompile] 
     public struct TriangleJob : IJobParallelFor
     {                
         [ReadOnly]
@@ -29,7 +31,9 @@ namespace URasterizer
 
         public bool UseBilinear;   
 
-        public ShaderType fsType;                 
+        public ShaderType fsType;  
+
+        public ShaderUniforms Uniforms;               
                 
 
         public void Execute(int index)
@@ -245,7 +249,7 @@ namespace URasterizer
 
                         switch(fsType){
                             case ShaderType.BlinnPhong:
-                                frameBuffer[index] = ShaderContext.FSBlinnPhong(input);
+                                frameBuffer[index] = ShaderContext.FSBlinnPhong(input, Uniforms);
                                 break;
                             case ShaderType.NormalVisual:
                                 frameBuffer[index] = ShaderContext.FSNormalVisual(input);

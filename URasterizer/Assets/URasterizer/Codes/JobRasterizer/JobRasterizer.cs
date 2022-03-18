@@ -22,9 +22,7 @@ namespace URasterizer
         Color[] temp_buf;
         float[] temp_depth_buf;
 
-        public Texture2D texture;
-
-        public FragmentShader CurrentFragmentShader {get; set;}
+        public Texture2D texture;        
 
         //Stats
         int _trianglesAll, _trianglesRendered;
@@ -39,6 +37,8 @@ namespace URasterizer
         public String Name { get=>"CPU Jobs"; }
 
         public Texture ColorTexture { get=>texture; }
+
+        ShaderUniforms Uniforms;
 
 
         public JobRasterizer(int w, int h, RenderingConfig config)
@@ -106,34 +106,18 @@ namespace URasterizer
         }        
 
         public void SetupUniforms(Camera camera, Light mainLight)
-        {
-            switch (_config.FragmentShaderType)
-            {
-                case ShaderType.VertexColor:
-                    CurrentFragmentShader = ShaderContext.FSVertexColor;
-                    break;
-                case ShaderType.BlinnPhong:
-                    CurrentFragmentShader = ShaderContext.FSBlinnPhong;
-                    break;
-                case ShaderType.NormalVisual:
-                    CurrentFragmentShader = ShaderContext.FSNormalVisual;
-                    break;
-                default:
-                    CurrentFragmentShader = ShaderContext.FSBlinnPhong;
-                    break;
-            }
-
+        {            
             ShaderContext.Config = _config;
 
             var camPos = camera.transform.position;
             camPos.z *= -1;
-            ShaderContext.Uniforms.WorldSpaceCameraPos = camPos;            
+            Uniforms.WorldSpaceCameraPos = camPos;            
 
             var lightDir = mainLight.transform.forward;
             lightDir.z *= -1;
-            ShaderContext.Uniforms.WorldSpaceLightDir = -lightDir;
-            ShaderContext.Uniforms.LightColor = mainLight.color * mainLight.intensity;
-            ShaderContext.Uniforms.AmbientColor = _config.AmbientColor;
+            Uniforms.WorldSpaceLightDir = -lightDir;
+            Uniforms.LightColor = mainLight.color * mainLight.intensity;
+            Uniforms.AmbientColor = _config.AmbientColor;
             
             TransformTool.SetupViewProjectionMatrix(camera, Aspect, out _matView, out _matProjection);
         }
@@ -184,6 +168,7 @@ namespace URasterizer
             triJob.TextureHeight = ro.texture.height;
             triJob.UseBilinear = _config.BilinearSample;
             triJob.fsType = _config.FragmentShaderType;
+            triJob.Uniforms = Uniforms;
             JobHandle triHandle = triJob.Schedule(ro.jobData.trianglesData.Length, 2, vsHandle);
             triHandle.Complete();
 

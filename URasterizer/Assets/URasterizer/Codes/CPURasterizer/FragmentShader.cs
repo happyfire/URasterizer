@@ -39,9 +39,7 @@ namespace URasterizer
         public Vector3 WorldSpaceLightDir;
         public Color LightColor;
         public Color AmbientColor;
-    }
-
-    public delegate Color FragmentShader(FragmentShaderInputData input);
+    }    
 
     public enum ShaderType
     {
@@ -51,8 +49,7 @@ namespace URasterizer
     }
 
     public class ShaderContext
-    {
-        public static ShaderUniforms Uniforms;
+    {        
         public static RenderingConfig Config;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -70,7 +67,7 @@ namespace URasterizer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Color FSBlinnPhong(FragmentShaderInputData input)
+        public static Color FSBlinnPhong(FragmentShaderInputData input, ShaderUniforms Uniforms)
         {
             Color textureColor;
             int w = input.TextureWidth;

@@ -25,7 +25,7 @@ namespace URasterizer
 
         public Texture2D texture;
 
-        public FragmentShader CurrentFragmentShader {get; set;}
+        ShaderUniforms Uniforms;        
 
         //Stats
         int _trianglesAll, _trianglesRendered;
@@ -132,34 +132,18 @@ namespace URasterizer
         }        
 
         public void SetupUniforms(Camera camera, Light mainLight)
-        {
-            switch (_config.FragmentShaderType)
-            {
-                case ShaderType.VertexColor:
-                    CurrentFragmentShader = ShaderContext.FSVertexColor;
-                    break;
-                case ShaderType.BlinnPhong:
-                    CurrentFragmentShader = ShaderContext.FSBlinnPhong;
-                    break;
-                case ShaderType.NormalVisual:
-                    CurrentFragmentShader = ShaderContext.FSNormalVisual;
-                    break;
-                default:
-                    CurrentFragmentShader = ShaderContext.FSBlinnPhong;
-                    break;
-            }
-
+        {            
             ShaderContext.Config = _config;
 
             var camPos = camera.transform.position;
             camPos.z *= -1;
-            ShaderContext.Uniforms.WorldSpaceCameraPos = camPos;            
+            Uniforms.WorldSpaceCameraPos = camPos;            
 
             var lightDir = mainLight.transform.forward;
             lightDir.z *= -1;
-            ShaderContext.Uniforms.WorldSpaceLightDir = -lightDir;
-            ShaderContext.Uniforms.LightColor = mainLight.color * mainLight.intensity;
-            ShaderContext.Uniforms.AmbientColor = _config.AmbientColor;
+            Uniforms.WorldSpaceLightDir = -lightDir;
+            Uniforms.LightColor = mainLight.color * mainLight.intensity;
+            Uniforms.AmbientColor = _config.AmbientColor;
             
             TransformTool.SetupViewProjectionMatrix(camera, Aspect, out _matView, out _matProjection);
         }
@@ -654,8 +638,7 @@ namespace URasterizer
                                 Vector3 worldNormal_p = (alpha * t.Vertex0.WorldNormal / v[0].w + beta * t.Vertex1.WorldNormal / v[1].w + gamma * t.Vertex2.WorldNormal / v[2].w) * z;
                                 ProfileManager.EndSample();
 
-                                if (CurrentFragmentShader != null)
-                                {
+                         
                                     FragmentShaderInputData input = new FragmentShaderInputData();
                                     input.Color = color_p;
                                     input.UV = uv_p;
@@ -668,12 +651,19 @@ namespace URasterizer
                                     input.WorldNormal = worldNormal_p;
 
                                     ProfileManager.BeginSample("Rasterizer.RasterizeTriangle.FragmentShader");
-                                    frame_buf[index] = CurrentFragmentShader(input);
-                                    ProfileManager.EndSample();
-                                }
-                                
-
-                                
+                                    switch(_config.FragmentShaderType){
+                                        case ShaderType.BlinnPhong:
+                                            frame_buf[index] = ShaderContext.FSBlinnPhong(input, Uniforms);
+                                            break;
+                                        case ShaderType.NormalVisual:
+                                            frame_buf[index] = ShaderContext.FSNormalVisual(input);
+                                            break;
+                                        case ShaderType.VertexColor:
+                                            frame_buf[index] = ShaderContext.FSVertexColor(input);
+                                            break;
+                                    }
+                                    
+                                    ProfileManager.EndSample();                                                                                                
                             }
                         }                        
                     }
