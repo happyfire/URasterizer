@@ -25,5 +25,5 @@ StructuredBuffer<uint3> triangleBuffer; // All triangles of the mesh
 
 RWStructuredBuffer<VertexOutBuf> vertexOutBuffer;
 RWTexture2D<float4> frameColorTexture;
-RWTexture2D<float> frameDepthTexture;
+RWTexture2D<uint> frameDepthTexture;
 

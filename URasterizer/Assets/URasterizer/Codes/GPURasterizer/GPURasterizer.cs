@@ -72,7 +72,7 @@ namespace URasterizer
             _colorTexture.Create();       
             _colorTexture.filterMode = FilterMode.Point;
 
-            _depthTexture = new RenderTexture(w, h, 0, RenderTextureFormat.RFloat);
+            _depthTexture = new RenderTexture(w, h, 0, RenderTextureFormat.RGFloat);
             _depthTexture.enableRandomWrite = true;
             _depthTexture.Create();
             _depthTexture.filterMode = FilterMode.Point;

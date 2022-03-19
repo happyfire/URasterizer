@@ -88,6 +88,8 @@ void RasterizeTriangle(int idx0, int idx1, int idx2, float4 v[3])
     VertexOutBuf vertex1 = vertexOutBuffer[idx1];
     VertexOutBuf vertex2 = vertexOutBuffer[idx2];
 
+    const float tolerant = -0.0005;
+
     for(int y = minPY; y < maxPY; ++y)
     {
         for(int x = minPX; x < maxPX; ++x)
@@ -97,7 +99,8 @@ void RasterizeTriangle(int idx0, int idx1, int idx2, float4 v[3])
             float alpha = c.x;
             float beta = c.y;
             float gamma = c.z;
-            if(alpha < 0 || beta < 0 || gamma < 0){                                
+            
+            if(alpha < tolerant || beta < tolerant || gamma < tolerant){
                 continue;
             }            
 
@@ -106,12 +109,12 @@ void RasterizeTriangle(int idx0, int idx1, int idx2, float4 v[3])
             //zp为透视校正插值后的screen space z值
             float zp = (alpha * v[0].z / v[0].w + beta * v[1].z / v[1].w + gamma * v[2].z / v[2].w) * z;
             
-            //深度测试(注意我们这儿的z值越大越靠近near plane，因此大值通过测试）            
-            if(zp > frameDepthTexture[uint2(x,y)])
-            {
-                            
-                frameDepthTexture[uint2(x,y)] = zp;
-                
+            //深度测试(注意我们这儿的z值越大越靠近near plane，因此大值通过测试）
+            uint PrevDepth;
+            uint DepthInt = asuint(zp);
+            InterlockedMax(frameDepthTexture[uint2(x, y)], DepthInt, PrevDepth);
+            if(DepthInt > PrevDepth)
+            {                                                            
                 //透视校正插值
                 
                 float2 uv_p = (alpha * vertex0.uv / v[0].w + beta * vertex1.uv / v[1].w + gamma * vertex2.uv / v[2].w) * z;

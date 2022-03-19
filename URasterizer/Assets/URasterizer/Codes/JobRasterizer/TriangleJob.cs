@@ -202,11 +202,11 @@ namespace URasterizer
             int maxPY = Mathf.CeilToInt(maxY);
             maxPY = maxPY > screenHeight ? screenHeight : maxPY;
 
-            
-                            
+            const float tolerant = -0.0005f;
+
             // 遍历当前三角形包围中的所有像素，判断当前像素是否在三角形中
             // 对于在三角形中的像素，使用重心坐标插值得到深度值，并使用z buffer进行深度测试和写入
-            for(int y = minPY; y < maxPY; ++y)
+            for (int y = minPY; y < maxPY; ++y)
             {
                 for(int x = minPX; x < maxPX; ++x)
                 {                                        
@@ -215,7 +215,8 @@ namespace URasterizer
                     float alpha = c.x;
                     float beta = c.y;
                     float gamma = c.z;
-                    if(alpha < 0 || beta < 0 || gamma < 0){                                
+                    if(alpha < tolerant || beta < tolerant || gamma < tolerant)
+                    {                                
                         continue;
                     }
                     //透视校正插值，z为透视校正插值后的view space z值

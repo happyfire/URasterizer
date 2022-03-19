@@ -75,14 +75,14 @@ namespace URasterizer
                         
             if(input.UseBilinear)
             {
-                float u_img = input.UV.x * w;
+                float u_img = input.UV.x * (w-1);
                 int u_img_i = (int)(u_img);
                 int u0 = u_img < u_img_i + 0.5 ? u_img_i - 1 : u_img_i;
                 if(u0<0) u0 = 0;
                 int u1 = u0 + 1;
                 float s = u_img - (u0 + 0.5f);
 
-                float v_img = input.UV.y * h;
+                float v_img = input.UV.y * (h-1);
                 int v_img_i = (int)(v_img);        
                 int v0 = v_img < v_img_i + 0.5 ? v_img_i-1 : v_img_i;
                 if(v0<0) v0 = 0;
@@ -102,8 +102,8 @@ namespace URasterizer
             }
             else
             {
-                int x = (int)(w * input.UV.x);
-                int y = (int)(h * input.UV.y);                            
+                int x = (int)((w-1) * input.UV.x);
+                int y = (int)((h-1) * input.UV.y);                            
                 textureColor = GetTextureColor(input.TextureData, w, h, x, y);
             }            
                         
