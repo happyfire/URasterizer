@@ -179,7 +179,7 @@ namespace URasterizer
 
         public void UpdateFrame()
         {
-            ProfileManager.BeginSample("CPURasterizer.UpdateFrame");
+            ProfileManager.BeginSample("JobRasterizer.UpdateFrame");
 
             switch (_config.DisplayBuffer)
             {

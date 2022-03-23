@@ -178,7 +178,7 @@ namespace URasterizer
             /// ------------- Vertex Shader -------------------
             VSOutBuf[] vsOutput = ro.cpuData.vsOutputBuffer;                   
             
-            ProfileManager.BeginSample("Rasterizer.VertexShader CPU");
+            ProfileManager.BeginSample("CPURasterizer.VertexShader CPU");
             for(int i=0; i<mesh.vertexCount; ++i)
             {                
                 var vert = ro.cpuData.MeshVertices[i];        
@@ -192,7 +192,7 @@ namespace URasterizer
             }
             ProfileManager.EndSample();            
             
-            ProfileManager.BeginSample("Rasterizer.PrimitiveAssembly");
+            ProfileManager.BeginSample("CPURasterizer.PrimitiveAssembly");
 
             var indices = ro.cpuData.MeshTriangles;
             for(int i=0; i< indices.Length; i+=3)
@@ -630,7 +630,7 @@ namespace URasterizer
                                 depth_buf[index] = zp;
                                 
                                 //透视校正插值
-                                ProfileManager.BeginSample("Rasterizer.RasterizeTriangle.AttributeInterpolation");
+                                ProfileManager.BeginSample("CPURasterizer.AttributeInterpolation");
                                 Color color_p = (alpha * t.Vertex0.Color / v[0].w + beta * t.Vertex1.Color / v[1].w + gamma * t.Vertex2.Color / v[2].w) * z;
                                 Vector2 uv_p = (alpha * t.Vertex0.Texcoord / v[0].w + beta * t.Vertex1.Texcoord / v[1].w + gamma * t.Vertex2.Texcoord / v[2].w) * z;
                                 Vector3 normal_p = (alpha * t.Vertex0.Normal / v[0].w + beta * t.Vertex1.Normal  / v[1].w + gamma * t.Vertex2.Normal  / v[2].w) * z;
@@ -650,7 +650,7 @@ namespace URasterizer
                                     input.WorldPos = worldPos_p;
                                     input.WorldNormal = worldNormal_p;
 
-                                    ProfileManager.BeginSample("Rasterizer.RasterizeTriangle.FragmentShader");
+                                    ProfileManager.BeginSample("CPURasterizer.FragmentShader");
                                     switch(_config.FragmentShaderType){
                                         case ShaderType.BlinnPhong:
                                             frame_buf[index] = ShaderContext.FSBlinnPhong(input, Uniforms);

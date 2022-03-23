@@ -9,24 +9,18 @@ namespace URasterizer
 
         public static void FillArray<T>(T[] arr, T value)
         {
-            int i = 0;
-            if(arr.Length > 16)
-            {
-                do
-                {
-                    arr[i++] = value;
-                } while (i < arr.Length);
+            int length = arr.Length;            
+            if(length == 0){
+                return;
+            }
+            arr[0] = value;
 
-                while( i + 16 < arr.Length)
-                {
-                    Array.Copy(arr, 0, arr, i, 16);
-                    i += 16;
-                }
+            int arrayHalfLen = length/2;
+            int copyLength;
+            for(copyLength = 1; copyLength <= arrayHalfLen; copyLength<<=1){
+                Array.Copy(arr, 0, arr, copyLength, copyLength);
             }
-            while (i < arr.Length)
-            {
-                arr[i++] = value;
-            }
+            Array.Copy(arr, 0, arr, copyLength, length-copyLength);            
         }
 
         //在ClipSpace中，判断OBB顶点是否在视锥外部。输入v为clip space下OBB的8个顶点
