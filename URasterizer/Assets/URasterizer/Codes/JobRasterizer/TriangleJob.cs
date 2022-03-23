@@ -82,17 +82,18 @@ namespace URasterizer
             // ------- Viewport Transform ----------
             //NDC to screen space            
             {
-
-                v0.x = 0.5f * screenWidth * (v0.x + 1.0f);
-                v0.y = 0.5f * screenHeight * (v0.y + 1.0f);                
+                int max_w = screenWidth - 1;
+                int max_h = screenHeight - 1;
+                v0.x = 0.5f * max_w * (v0.x + 1.0f);
+                v0.y = 0.5f * max_h * (v0.y + 1.0f);                
                 v0.z = v0.z * 0.5f + 0.5f; 
 
-                v1.x = 0.5f * screenWidth * (v1.x + 1.0f);
-                v1.y = 0.5f * screenHeight * (v1.y + 1.0f);                
+                v1.x = 0.5f * max_w * (v1.x + 1.0f);
+                v1.y = 0.5f * max_h * (v1.y + 1.0f);                
                 v1.z = v1.z * 0.5f + 0.5f; 
 
-                v2.x = 0.5f * screenWidth * (v2.x + 1.0f);
-                v2.y = 0.5f * screenHeight * (v2.y + 1.0f);                
+                v2.x = 0.5f * max_w * (v2.x + 1.0f);
+                v2.y = 0.5f * max_h * (v2.y + 1.0f);                
                 v2.z = v2.z * 0.5f + 0.5f; 
             }
 

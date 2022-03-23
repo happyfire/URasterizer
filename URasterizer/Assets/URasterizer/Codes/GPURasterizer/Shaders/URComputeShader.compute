@@ -61,8 +61,8 @@ void TriangleProcess(uint3 id : SV_DispatchThreadID)
     for (k = 0; k < 3; k++)
     {
         float4 vec = v[k];
-        vec.x = 0.5f * frameBufferSize.x * (vec.x + 1.0f);
-        vec.y = 0.5f * frameBufferSize.y * (vec.y + 1.0f);
+        vec.x = 0.5f * (frameBufferSize.x - 1) * (vec.x + 1.0f);
+        vec.y = 0.5f * (frameBufferSize.y - 1)* (vec.y + 1.0f);
 
         //在硬件渲染中，NDC的z值经过硬件的透视除法之后就直接写入到depth buffer了，如果要调整需要在投影矩阵中调整
         //由于我们是软件渲染，所以可以在这里调整z值。                    

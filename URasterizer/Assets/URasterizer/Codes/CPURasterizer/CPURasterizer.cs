@@ -156,7 +156,7 @@ namespace URasterizer
 
             Mesh mesh = ro.mesh;
             
-            _matModel = ro.GetModelMatrix();                      
+            _matModel = ro.GetModelMatrix();                       
 
             Matrix4x4 mvp = _matProjection * _matView * _matModel;
             if(_config.FrustumCulling && URUtils.FrustumCulling(mesh.bounds, mvp)){                
@@ -248,8 +248,8 @@ namespace URasterizer
                 for (int k = 0; k < 3; k++)
                 {
                     var vec = v[k];
-                    vec.x = 0.5f * _width * (vec.x + 1.0f);
-                    vec.y = 0.5f * _height * (vec.y + 1.0f);
+                    vec.x = 0.5f * (_width - 1) * (vec.x + 1.0f);
+                    vec.y = 0.5f * (_height -1) * (vec.y + 1.0f);
 
                     //在硬件渲染中，NDC的z值经过硬件的透视除法之后就直接写入到depth buffer了，如果要调整需要在投影矩阵中调整
                     //由于我们是软件渲染，所以可以在这里调整z值。                    
@@ -262,7 +262,7 @@ namespace URasterizer
                     //但是这么调整后，正好和Unity在DirectX平台的Reverse z一样，让near plane附近的z值的浮点数精度提高。
                     vec.z = vec.z * 0.5f + 0.5f; 
 
-                    v[k] = vec;
+                    v[k] = vec; 
                 }
 
                 Triangle t = new Triangle();
